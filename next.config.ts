@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   output: 'export',
   // For GitHub Pages deployment - adjust basePath if deploying to a subpath
-  // basePath: process.env.NODE_ENV === 'production' ? '/ctf-scoreboard' : '',
+  basePath: process.env.NODE_ENV === 'production' ? '/ctf-scoreboard' : '',
   images: {
     unoptimized: true, // Required for static export
   },

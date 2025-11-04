@@ -215,6 +215,10 @@ npm run build
 - Set appropriate rate limits to avoid overwhelming your CTFd instance
 - The application stores configuration (API URL, token) in the browser's localStorage
 
+> **⚠️ Security Warning:**  
+> Data stored in localStorage (including your API token) can be accessed by any script running on the same origin.  
+> **Do not use this application on shared or public computers unless you clear localStorage after use.**  
+> To clear, open your browser's developer tools and run: `localStorage.clear();`
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.

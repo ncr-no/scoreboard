@@ -215,6 +215,7 @@ export default function CTFScoreboard() {
             )}
             <ConfigDialog />
           </div>
+          {/* Add right padding on mobile to prevent title from overlapping with settings button, remove on larger screens where there's more space */}
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2 flex items-center justify-center gap-2 sm:gap-3 pr-20 sm:pr-0">
             {ctfNameLoading ? (
               <Skeleton className="h-8 sm:h-10 w-48 sm:w-64" />

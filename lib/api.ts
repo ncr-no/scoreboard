@@ -11,6 +11,16 @@ interface ApiConfig {
   apiToken: string;
 }
 
+/**
+ * Detects if the application is running in development mode (localhost).
+ * Used to determine whether to use the API proxy or direct API calls.
+ * 
+ * @returns true if running on localhost, false otherwise
+ */
+function isDevelopmentEnvironment(): boolean {
+  return typeof window !== 'undefined' && window.location.hostname === 'localhost';
+}
+
 // Rate limit tracking
 let lastRateLimitTime: number | null = null;
 let rateLimitCount = 0;
@@ -85,7 +95,7 @@ async function fetchFromCTFd<T>(endpoint: string, config: ApiConfig): Promise<T>
   }
   
   // Use proxy in development, direct calls in production
-  const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+  const isDevelopment = isDevelopmentEnvironment();
   
   let fullUrl: string;
   if (isDevelopment) {
@@ -156,7 +166,7 @@ async function fetchSubmissionsFromCTFd(endpoint: string, config: ApiConfig): Pr
   }
 
   // Use proxy in development, direct calls in production
-  const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+  const isDevelopment = isDevelopmentEnvironment();
   
   let fullUrl: string;
   if (isDevelopment) {
@@ -248,7 +258,7 @@ export const getSubmissions = (config: ApiConfig, params?: {
 export const getCtfConfig = async (key: string, config: ApiConfig): Promise<string | null> => {
   try {
     // Use proxy in development, direct calls in production
-    const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+    const isDevelopment = isDevelopmentEnvironment();
     
     let fullUrl: string;
     if (isDevelopment) {
@@ -300,7 +310,7 @@ export const getCtfEnd = (config: ApiConfig): Promise<number | null> =>
 
 export const getChallengeSolves = async (config: ApiConfig, challengeId: number): Promise<ChallengeSolvesResponse> => {
   // Use proxy in development, direct calls in production
-  const isDevelopment = typeof window !== 'undefined' && window.location.hostname === 'localhost';
+  const isDevelopment = isDevelopmentEnvironment();
   
   let fullUrl: string;
   if (isDevelopment) {

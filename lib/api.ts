@@ -27,7 +27,9 @@ async function fetchWithRetry(
     
     // If we get rate limited (429) and have retries left, retry with backoff
     if (response.status === 429 && retries > 0) {
-      console.warn(`Rate limited when accessing ${url}. Retrying after ${backoff}ms...`);
+      // Sanitize URL for logging - remove query parameters that might contain sensitive data
+      const sanitizedUrl = url.split('?')[0];
+      console.warn(`Rate limited when accessing ${sanitizedUrl}. Retrying after ${backoff}ms...`);
       
       // Wait for backoff period
       await new Promise(resolve => setTimeout(resolve, backoff));
@@ -39,7 +41,9 @@ async function fetchWithRetry(
     return response;
   } catch (error) {
     if (retries > 0) {
-      console.warn(`Error fetching ${url}, retrying...`, error);
+      // Sanitize URL for logging - remove query parameters that might contain sensitive data
+      const sanitizedUrl = url.split('?')[0];
+      console.warn(`Error fetching ${sanitizedUrl}, retrying...`);
       
       // Wait for backoff period
       await new Promise(resolve => setTimeout(resolve, backoff));
@@ -189,13 +193,18 @@ export const getCtfConfig = async (key: string, config: ApiConfig): Promise<stri
   try {
     const fullUrl = `${config.apiUrl}/api/v1/configs?key=${key}`;
     
-    const response = await fetch(fullUrl, {
-      headers: {
-        'Authorization': `Token ${config.apiToken}`,
-        'Content-Type': 'application/json',
+    const response = await fetchWithRetry(
+      fullUrl,
+      {
+        headers: {
+          'Authorization': `Token ${config.apiToken}`,
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-cache',
       },
-      cache: 'no-cache',
-    });
+      3, // 3 retries
+      300 // Starting backoff of 300ms
+    );
 
     if (!response.ok) {
       return null;
@@ -224,13 +233,18 @@ export const getCtfEnd = (config: ApiConfig): Promise<number | null> =>
 export const getChallengeSolves = async (config: ApiConfig, challengeId: number): Promise<ChallengeSolvesResponse> => {
   const fullUrl = `${config.apiUrl}/api/v1/challenges/${challengeId}/solves`;
   
-  const res = await fetch(fullUrl, {
-    headers: {
-      'Authorization': `Token ${config.apiToken}`,
-      'Content-Type': 'application/json',
+  const res = await fetchWithRetry(
+    fullUrl,
+    {
+      headers: {
+        'Authorization': `Token ${config.apiToken}`,
+        'Content-Type': 'application/json',
+      },
+      cache: 'no-cache',
     },
-    cache: 'no-cache',
-  });
+    3, // 3 retries
+    300 // Starting backoff of 300ms
+  );
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));

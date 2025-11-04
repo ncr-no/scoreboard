@@ -2,7 +2,8 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  output: 'export',
+  // Use static export only in production, allow server features in development
+  output: process.env.NODE_ENV === 'production' ? 'export' : undefined,
   // For GitHub Pages deployment - adjust basePath if deploying to a subpath
   basePath: process.env.NODE_ENV === 'production' ? '/ctf-scoreboard' : '',
   images: {

@@ -2,6 +2,10 @@
 
 A modern, real-time CTF (Capture The Flag) scoreboard application built with Next.js that provides an enhanced viewing experience for CTFd competitions. This dashboard offers live updates, animated celebrations, comprehensive analytics, and a polished interface for both participants and spectators.
 
+**🌐 Static Deployment Ready**: This application can be deployed as a static site to GitHub Pages, Netlify, Vercel, or any static hosting platform. It connects directly to your CTFd instance via API, running entirely in the browser.
+
+> **⚠️ Important**: When deploying this application, you must configure CORS in your CTFd instance to allow requests from your deployment domain. See the [Deployment](#-deployment) section for details.
+
 ## ✨ Key Features
 
 ### 🏆 Real-Time Scoreboard
@@ -162,23 +166,59 @@ Audio files are included in `/public/sounds/` and can be customized.
 
 ## 🚀 Deployment
 
-### Production Build
+### GitHub Pages (Recommended for Static Hosting)
+
+This scoreboard can be deployed to GitHub Pages as a static site. The application will run entirely in the browser and connect directly to your CTFd instance via its API.
+
+**Prerequisites:**
+- Your CTFd instance must have CORS enabled to allow requests from your GitHub Pages domain
+- Generate a CTFd API token with appropriate permissions
+
+**Setup Instructions:**
+
+1. **Configure GitHub Repository Settings:**
+   - Go to your repository Settings → Pages
+   - Under "Build and deployment", select "GitHub Actions" as the source
+
+2. **Deploy:**
+   - Push your changes to the `main` branch
+   - The GitHub Actions workflow will automatically build and deploy your site
+   - Your scoreboard will be available at `https://<username>.github.io/<repository-name>/`
+
+3. **Optional: Custom Domain**
+   - Add a `CNAME` file in the `public` directory with your domain
+   - Configure your DNS settings to point to GitHub Pages
+   - Update the `basePath` in `next.config.ts` if deploying to a subpath
+
+4. **Configure CTFd CORS:**
+   - Add your GitHub Pages URL to CTFd's allowed origins
+   - This is typically done in CTFd's configuration or reverse proxy settings
+
+**Note:** The first time you access the deployed site, you'll need to configure it with your CTFd API URL and token using the settings dialog.
+
+### Manual Static Build
 ```bash
 npm run build
-npm run start
+# The static files will be in the 'out' directory
+# Serve them with any static file server
 ```
 
-### Deployment Platforms
-- **Vercel**: Optimal deployment platform (zero-config)
-- **Netlify**: Static site deployment with serverless functions
-- **Docker**: Containerized deployment for any platform
-- **Self-hosted**: Traditional VPS or dedicated server
+### Alternative Deployment Platforms
+- **Vercel**: Deploy with zero config (will use static export)
+- **Netlify**: Drag and drop the `out` folder or connect your repository
+- **Cloudflare Pages**: Connect your repository for automatic deployments
+- **Any Static Host**: Upload the contents of the `out` directory
 
 ### Environment Considerations
 - Ensure your CTFd instance is accessible from your deployment environment
-- Configure CORS settings in CTFd if needed
+- **Configure CORS settings in CTFd** to allow requests from your deployment domain
 - Set appropriate rate limits to avoid overwhelming your CTFd instance
+- The application stores configuration (API URL, token) in the browser's localStorage
 
+> **⚠️ Security Warning:**  
+> Data stored in localStorage (including your API token) can be accessed by any script running on the same origin.  
+> **Do not use this application on shared or public computers unless you clear localStorage after use.**  
+> To clear, open your browser's developer tools and run: `localStorage.clear();`
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.

@@ -1,0 +1,14 @@
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Flag pole -->
+  <rect x="4" y="2" width="2" height="28" fill="#374151"/>
+  
+  <!-- Flag -->
+  <path d="M6 4 L26 4 L26 10 L22 12 L26 14 L26 20 L6 20 Z" fill="#EF4444"/>
+  
+  <!-- Flag details (stripes) -->
+  <rect x="6" y="8" width="20" height="2" fill="#DC2626"/>
+  <rect x="6" y="14" width="20" height="2" fill="#DC2626"/>
+  
+  <!-- Flag pole top -->
+  <circle cx="5" cy="2" r="1.5" fill="#F59E0B"/>
+</svg>

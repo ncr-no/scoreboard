@@ -9,6 +9,7 @@ import {
 interface ApiConfig {
   apiUrl: string;
   apiToken: string;
+  topTeamsCount?: number;
 }
 
 // Rate limit tracking
@@ -179,8 +180,10 @@ async function fetchSubmissionsFromCTFd(endpoint: string, config: ApiConfig): Pr
 }
 
 // Specific API functions - these now require config to be passed
-export const getScoreboard = (config: ApiConfig): Promise<{ data: Record<string, ScoreboardEntry> }> => 
-  fetchFromCTFd<Record<string, ScoreboardEntry>>('/scoreboard/top/10', config).then(data => ({ data }));
+export const getScoreboard = (config: ApiConfig): Promise<{ data: Record<string, ScoreboardEntry> }> => {
+  const count = config.topTeamsCount || 10;
+  return fetchFromCTFd<Record<string, ScoreboardEntry>>(`/scoreboard/top/${count}`, config).then(data => ({ data }));
+};
 
 export const getFullScoreboard = (config: ApiConfig): Promise<ScoreboardEntry[]> => 
   fetchFromCTFd<ScoreboardEntry[]>('/scoreboard', config);

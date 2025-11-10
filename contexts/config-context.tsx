@@ -6,6 +6,7 @@ interface ConfigState {
   apiUrl: string;
   apiToken: string;
   refetchInterval: number; // in milliseconds
+  topTeamsCount: number; // number of top teams to fetch (minimum 10)
 }
 
 interface ConfigContextType {
@@ -23,6 +24,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     apiUrl: '',
     apiToken: '',
     refetchInterval: 60000, // Default to 60 seconds
+    topTeamsCount: 10, // Default to 10 teams
   });
 
   const [isConfigured, setIsConfigured] = useState(false);
@@ -38,6 +40,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
           apiUrl: parsed.apiUrl || '',
           apiToken: parsed.apiToken || '',
           refetchInterval: parsed.refetchInterval || 30000,
+          topTeamsCount: parsed.topTeamsCount || 10,
         };
         setConfigState(configWithDefaults);
         setIsConfigured(!!configWithDefaults.apiUrl && !!configWithDefaults.apiToken);

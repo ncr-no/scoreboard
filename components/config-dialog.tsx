@@ -22,6 +22,7 @@ export function ConfigDialog() {
     apiUrl: config.apiUrl,
     apiToken: config.apiToken,
     refetchInterval: config.refetchInterval / 1000, // Store in seconds for UI
+    topTeamsCount: config.topTeamsCount,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -40,6 +41,13 @@ export function ConfigDialog() {
       return;
     }
 
+    // Validate top teams count
+    const topTeams = Number(formData.topTeamsCount);
+    if (isNaN(topTeams) || topTeams < 10 || topTeams > 100) {
+      alert('Top teams count must be between 10 and 100');
+      return;
+    }
+
     // Remove trailing slash from URL if present
     const cleanUrl = formData.apiUrl.replace(/\/$/, '');
     
@@ -47,12 +55,13 @@ export function ConfigDialog() {
       apiUrl: cleanUrl,
       apiToken: formData.apiToken.trim(),
       refetchInterval: interval * 1000, // Convert to milliseconds
+      topTeamsCount: topTeams,
     });
     
     setOpen(false);
   };
 
-  const handleInputChange = (field: 'apiUrl' | 'apiToken' | 'refetchInterval') => (
+  const handleInputChange = (field: 'apiUrl' | 'apiToken' | 'refetchInterval' | 'topTeamsCount') => (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     setFormData(prev => ({
@@ -70,6 +79,7 @@ export function ConfigDialog() {
           apiUrl: config.apiUrl,
           apiToken: config.apiToken,
           refetchInterval: config.refetchInterval / 1000,
+          topTeamsCount: config.topTeamsCount,
         });
       }
     }}>
@@ -132,6 +142,25 @@ export function ConfigDialog() {
             />
             <p className="text-xs text-muted-foreground">
               How often to refresh data automatically (5-300 seconds)
+            </p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="topTeamsCount">Top Teams Count</Label>
+            <Input
+              id="topTeamsCount"
+              type="number"
+              min="10"
+              max="100"
+              placeholder="10"
+              value={formData.topTeamsCount}
+              onChange={handleInputChange('topTeamsCount')}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              Number of top teams to display (10-100)
+            </p>
+            <p className="text-xs text-amber-600 dark:text-amber-500 font-medium">
+              ⚠️ Warning: Increasing this value can lead to API rate limiting, which may break most of the functionality.
             </p>
           </div>
           <div className="flex gap-2 justify-end">

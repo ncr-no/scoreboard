@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 
 // Use basePath-aware paths for GitHub Pages deployment
 const getAssetPath = (path: string) => {
-  const basePath = process.env.NODE_ENV === 'production' ? '/ctf-scoreboard' : '';
+  const basePath = process.env.NODE_ENV === 'production' ? '/scoreboard' : '';
   return `${basePath}${path}`;
 };
 

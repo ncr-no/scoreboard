@@ -19,16 +19,23 @@ interface RecentSubmissionsProps {
 }
 
 export function RecentSubmissions({ 
-	submissions = [],
-	isLoading = false,
-	isError = false,
-	error = null,
-	onRefresh,
-	}: RecentSubmissionsProps) {
+	submissions: externalSubmissions, 
+	isLoading: externalIsLoading, 
+	isError: externalIsError, 
+	error: externalError, 
+	onRefresh: externalOnRefresh,
+	useExternalData = false
+}: RecentSubmissionsProps) {
+	const liveSubmissions = useLiveSubmissions();
 	const { config } = useConfig();
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [currentPage, setCurrentPage] = useState(1);
-	const itemsPerPage = 10;
+	const itemsPerPage = 8;
+
+	const submissions = useExternalData ? externalSubmissions || [] : liveSubmissions.submissions;
+	const isLoading = useExternalData ? externalIsLoading || false : liveSubmissions.isLoading;
+	const isError = useExternalData ? externalIsError || false : liveSubmissions.isError;
+	const error = useExternalData ? externalError : liveSubmissions.error;
 
 	// Filter and sort submissions
 	const filteredSubmissions = [...submissions]
@@ -60,8 +67,10 @@ export function RecentSubmissions({
 
 	const handleRefresh = () => {
 		setIsRefreshing(true);
-		if (onRefresh) {
-			onRefresh();
+		if (useExternalData && externalOnRefresh) {
+			externalOnRefresh();
+		} else {
+			liveSubmissions.refresh();
 		}
 		setTimeout(() => setIsRefreshing(false), 1000);
 	};
@@ -83,14 +92,14 @@ export function RecentSubmissions({
 	if (isLoading) {
 		return (
 			<Card className="h-full flex flex-col">
-				<CardHeader className="pb-3">
+				<CardHeader className="pb-2 px-4 py-2">
 					<div className="flex justify-between items-center">
 						<div>
-							<CardTitle className="flex items-center gap-2">
-								<Clock className="h-5 w-5" />
+							<CardTitle className="flex items-center gap-1 text-base">
+								<Clock className="h-4 w-4" />
 								Recent Submissions
 							</CardTitle>
-							<CardDescription className="flex items-center gap-1">
+							<CardDescription className="flex items-center gap-1 text-xs">
 								<Wifi className="h-3 w-3 text-green-500 animate-pulse" /> 
 								Live updates every {Math.round(config.refetchInterval/1000)}s
 							</CardDescription>
@@ -107,7 +116,7 @@ export function RecentSubmissions({
 						</Button>
 					</div>
 				</CardHeader>
-				<CardContent className="flex-1 p-0 sm:px-6">
+				<CardContent className="flex-1 p-0 sm:px-6 ">
 					<SubmissionsSkeleton />
 				</CardContent>
 			</Card>
@@ -154,14 +163,14 @@ export function RecentSubmissions({
 
 	return (
 		<Card className="h-full flex flex-col">
-			<CardHeader className="pb-3">
+			<CardHeader className="pb-2 px-4 py-2">
 				<div className="flex justify-between items-center">
 					<div>
-						<CardTitle className="flex items-center gap-2">
-							<Clock className="h-5 w-5" />
+						<CardTitle className="flex items-center gap-2 text-base">
+							<Clock className="h-4 w-4" />
 							Recent Submissions
 						</CardTitle>
-						<CardDescription className="flex items-center gap-1">
+						<CardDescription className="flex items-center gap-1 text-xs">
 							<Wifi className="h-3 w-3 text-green-500 animate-pulse" /> 
 							Live updates every {Math.round(config.refetchInterval/1000)}s
 						</CardDescription>
@@ -171,43 +180,43 @@ export function RecentSubmissions({
 						size="sm" 
 						onClick={handleRefresh}
 						disabled={isLoading || isRefreshing}
-						className="h-8 w-8 p-0"
+						className="h-7 w-7 p-0"
 					>
-						<RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+						<RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
 						<span className="sr-only">Refresh</span>
 					</Button>
 				</div>
 			</CardHeader>
-			<CardContent className="flex-1 flex flex-col p-0 sm:px-6">
+			<CardContent className="flex-1 flex flex-col p-0 px-4 overflow-hidden">
 				{filteredSubmissions.length > 0 ? (
 					<>
-						<div className="space-y-2 flex-1 px-4 sm:px-0">
+						<div className="space-y-1.5 flex-1 overflow-y-auto">
 							{paginatedSubmissions.map((submission) => (
 								<div
 									key={submission.id}
-									className="flex items-center justify-between p-2 sm:p-3 rounded-lg border bg-card hover:bg-accent/50 transition-colors text-xs sm:text-sm"
+									className="flex items-center justify-between p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors text-xs"
 								>
-									<div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+									<div className="flex items-center gap-2 min-w-0 flex-1">
 										<div className="flex-shrink-0">
-											<CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+											<CheckCircle className="h-3 w-3 text-green-500" />
 										</div>
-										<div className="flex items-center gap-1 sm:gap-2 min-w-0">
-											<User className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-											<span className="font-medium truncate">{submission.user.name}</span>
+										<div className="flex items-center gap-1 min-w-0">
+											<User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+											<span className="font-medium truncate text-xs">{submission.user.name}</span>
 										</div>
-										<div className="flex items-center gap-1 sm:gap-2 min-w-0">
-											<Flag className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
-											<span className="truncate">{submission.challenge.name}</span>
+										<div className="flex items-center gap-1 min-w-0">
+											<Flag className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+											<span className="truncate text-xs">{submission.challenge.name}</span>
 										</div>
-										<Badge className={`${getCategoryColor(submission.challenge.category)} text-xs flex-shrink-0 hidden sm:inline-flex`}>
+										<Badge className={`${getCategoryColor(submission.challenge.category)} text-[10px] px-1.5 py-0 flex-shrink-0 hidden sm:inline-flex`}>
 											{submission.challenge.category}
 										</Badge>
 									</div>
-									<div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
-										<span className="font-mono text-xs sm:text-sm font-semibold text-green-600">
+									<div className="flex items-center gap-2 flex-shrink-0">
+										<span className="font-mono text-xs font-semibold text-green-600">
 											+{submission.challenge.value}
 										</span>
-										<span className="text-xs text-muted-foreground hidden sm:inline" title={new Date(submission.date).toLocaleString()}>
+										<span className="text-[10px] text-muted-foreground hidden sm:inline" title={new Date(submission.date).toLocaleString()}>
 											{formatTimeAgo(submission.date)}
 										</span>
 									</div>
@@ -217,21 +226,21 @@ export function RecentSubmissions({
 						
 						{/* Pagination */}
 						{totalPages > 1 && (
-							<div className="flex items-center justify-between px-4 sm:px-0 py-3 sm:py-4 border-t mt-auto">
-								<div className="text-xs sm:text-sm text-muted-foreground">
-									Showing {startIndex + 1}-{Math.min(endIndex, filteredSubmissions.length)} of {filteredSubmissions.length}
+							<div className="flex items-center justify-between py-2 pb-[0.8rem] border-t mt-auto flex-shrink-0">
+								<div className="text-xs text-muted-foreground">
+									{startIndex + 1}-{Math.min(endIndex, filteredSubmissions.length)} of {filteredSubmissions.length}
 								</div>
-								<div className="flex items-center gap-2">
+								<div className="flex items-center gap-1">
 									<Button
 										variant="outline"
 										size="sm"
 										onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
 										disabled={currentPage === 1}
-										className="h-8 w-8 p-0"
+										className="h-7 w-7 p-0"
 									>
-										<ChevronLeft className="h-4 w-4" />
+										<ChevronLeft className="h-3 w-3" />
 									</Button>
-									<div className="text-xs sm:text-sm font-medium">
+									<div className="text-xs">
 										{currentPage} / {totalPages}
 									</div>
 									<Button
@@ -239,22 +248,22 @@ export function RecentSubmissions({
 										size="sm"
 										onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
 										disabled={currentPage === totalPages}
-										className="h-8 w-8 p-0"
+										className="h-7 w-7 p-0"
 									>
-										<ChevronRight className="h-4 w-4" />
+										<ChevronRight className="h-3 w-3" />
 									</Button>
 								</div>
 							</div>
 						)}
 					</>
 				) : (
-					<div className="text-center py-12 text-muted-foreground flex-1 flex flex-col items-center justify-center px-4">
-						<Clock className="h-12 w-12 mx-auto mb-4" />
-						<h3 className="text-lg font-semibold mb-2">No Recent Submissions</h3>
-						<p className="text-sm">Submissions will appear here as users solve challenges.</p>
-						<p className="text-sm mt-2">
+					<div className="text-center py-8 text-muted-foreground flex-1 flex flex-col items-center justify-center px-4">
+						<Clock className="h-8 w-8 mx-auto mb-3" />
+						<h3 className="text-sm font-semibold mb-1">No Recent Submissions</h3>
+						<p className="text-xs">Submissions will appear here as users solve challenges.</p>
+						<p className="text-xs mt-1.5">
 							<Wifi className="h-3 w-3 inline-block mr-1 text-green-500 animate-pulse" />
-							Auto-refreshing every {Math.round(config.refetchInterval/1000)} seconds
+							Auto-refreshing every {Math.round(config.refetchInterval/1000)}s
 						</p>
 					</div>
 				)}
@@ -265,18 +274,18 @@ export function RecentSubmissions({
 
 function SubmissionsSkeleton() {
 	return (
-		<div className="space-y-2 px-4 sm:px-0">
+		<div className="space-y-1.5">
 			{[...Array(10)].map((_, i) => (
-				<div key={i} className="flex items-center justify-between p-2 sm:p-3 rounded-lg border">
-					<div className="flex items-center gap-2 sm:gap-3 flex-1">
-						<Skeleton className="h-3 w-3 sm:h-4 sm:w-4 rounded-full" />
-						<Skeleton className="h-3 w-16 sm:h-4 sm:w-20" />
-						<Skeleton className="h-3 w-24 sm:h-4 sm:w-32" />
-						<Skeleton className="h-4 w-12 sm:h-5 sm:w-16 rounded-full hidden sm:block" />
+				<div key={i} className="flex items-center justify-between p-2 rounded-lg border">
+					<div className="flex items-center gap-2 flex-1">
+						<Skeleton className="h-3 w-3 rounded-full" />
+						<Skeleton className="h-3 w-16" />
+						<Skeleton className="h-3 w-24" />
+						<Skeleton className="h-4 w-12 rounded-full hidden sm:block" />
 					</div>
-					<div className="flex items-center gap-2 sm:gap-3">
-						<Skeleton className="h-3 w-8 sm:h-4 sm:w-10" />
-						<Skeleton className="h-3 w-10 sm:h-4 sm:w-12 hidden sm:block" />
+					<div className="flex items-center gap-2">
+						<Skeleton className="h-3 w-8" />
+						<Skeleton className="h-3 w-10 hidden sm:block" />
 					</div>
 				</div>
 			))}

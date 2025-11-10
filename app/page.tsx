@@ -60,12 +60,12 @@ export default function CTFScoreboard() {
   const [challengesPage, setChallengesPage] = useState(1);
   const [firstBloods, setFirstBloods] = useState<Map<number, number>>(new Map());
   const [firstBloodUsers, setFirstBloodUsers] = useState<Map<number, {id: number, name: string}>>(new Map());
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(10);
   const [currentTab, setCurrentTab] = useState("scoreboard");
   const [autoRotate, setAutoRotate] = useState(false);
   const [showAuthWarning, setShowAuthWarning] = useState(false);
   const [showConfigDialog, setShowConfigDialog] = useState(false);
-  const challengesPerPage = 9;
+  const challengesPerPage = 6;
   const tabs = ["scoreboard", "challenges", "analytics"];
 
   // Detect authentication errors
@@ -260,15 +260,20 @@ export default function CTFScoreboard() {
   return (
     <div className="min-h-screen overflow-x-hidden bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
       <DynamicTitle />
-      <div className="container mx-auto py-4 sm:py-8 px-2 sm:px-4">
-        <div className="text-center mb-4 sm:mb-8 relative">
-          <div className="absolute top-0 right-0 flex items-center gap-1 sm:gap-2 flex-wrap justify-end">
+      <div className="max-w-[1920px] mx-auto py-3 px-3 sm:px-6">
+        <div className="text-center mb-3 relative">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">
+            {ctfNameLoading ? (
+              <Skeleton className="h-8 sm:h-10 w-48 sm:w-64 mx-auto" />
+            ) : (
+              ctfName || 'CTF Scoreboard'
+            )}
+          </h1>
+          <div className="absolute top-0 right-0 flex items-center gap-1 sm:gap-2">
             {isConfigured && (
-              <div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground bg-muted px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
-                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span className="hidden sm:inline">Auto-refresh:</span>
-                <span className="sm:hidden">Refresh:</span>
-                {config.refetchInterval / 1000}s
+              <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span>Auto-refresh: {config.refetchInterval / 1000}s</span>
               </div>
             )}
             {process.env.NEXT_PUBLIC_SHOW_DEVTOOLS === 'true' && (
@@ -276,14 +281,6 @@ export default function CTFScoreboard() {
             )}
             <ConfigDialog />
           </div>
-          {/* Add right padding on mobile to prevent title from overlapping with settings button, remove on larger screens where there's more space */}
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2 flex items-center justify-center gap-2 sm:gap-3 pr-20 sm:pr-0">
-            {ctfNameLoading ? (
-              <Skeleton className="h-8 sm:h-10 w-48 sm:w-64" />
-            ) : (
-              ctfName || 'CTF Scoreboard'
-            )}
-          </h1>
         </div>
 
         {/* Authentication warning banner */}
@@ -300,111 +297,47 @@ export default function CTFScoreboard() {
 
         {!isConfigured ? (
           <Card className="max-w-2xl mx-auto">
-            <CardContent className="text-center py-16">
-              <Settings className="h-16 w-16 mx-auto mb-6 text-muted-foreground" />
-              <h3 className="text-2xl font-semibold mb-4">Configuration Required</h3>
-              <p className="text-muted-foreground mb-6 text-lg">
+            <CardContent className="text-center py-8 sm:py-16 px-4">
+              <Settings className="h-12 w-12 sm:h-16 sm:w-16 mx-auto mb-4 sm:mb-6 text-muted-foreground" />
+              <h3 className="text-xl sm:text-2xl font-semibold mb-3 sm:mb-4">Configuration Required</h3>
+              <p className="text-muted-foreground mb-4 sm:mb-6 text-base sm:text-lg">
                 Please configure your CTFd API URL and token to view the scoreboard.
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Click the settings button in the top-right corner to get started.
               </p>
             </CardContent>
           </Card>
         ) : (
           <>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 mb-4 sm:mb-8">
-              <Card>
-                <CardContent className="p-2 sm:p-4 text-center">
-                  <div className="flex items-center justify-center mb-1 sm:mb-2">
-                    <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
+            {/* Main Layout: Left (Tabs Content) and Right (Stats + Submissions - Always Visible) */}
+            <div className="flex flex-col lg:flex-row gap-3 md:gap-4">
+              {/* Left Side - Tabbed Content (Scoreboard/Challenges/Analytics) - Takes more space */}
+              <div className="w-full lg:w-[70%]">
+                <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-3 md:space-y-4">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <TabsList className="grid w-full grid-cols-3 gap-1">
+                      <TabsTrigger value="scoreboard" className="text-xs sm:text-sm">Scoreboard</TabsTrigger>
+                      <TabsTrigger value="challenges" className="text-xs sm:text-sm">Challenges</TabsTrigger>
+                      <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
+                    </TabsList>
+                    <button
+                      onClick={() => setAutoRotate(!autoRotate)}
+                      className={`flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 text-xs rounded-md transition-colors whitespace-nowrap ${
+                        autoRotate 
+                          ? 'bg-green-500 text-white hover:bg-green-600' 
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                      title={autoRotate ? "Auto-rotation enabled (10s)" : "Enable auto-rotation"}
+                    >
+                      <span className="hidden sm:inline">{autoRotate ? '🔄 Auto' : '▶️ Auto'}</span>
+                      <span className="sm:hidden">{autoRotate ? '🔄' : '▶️'}</span>
+                    </button>
                   </div>
-                  <div className="text-lg sm:text-2xl font-bold">{stats.totalusers}</div>
-                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Users</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-2 sm:p-4 text-center">
-                  <div className="flex items-center justify-center mb-1 sm:mb-2">
-                    <Flag className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
-                  </div>
-                  <div className="text-lg sm:text-2xl font-bold">{stats.totalChallenges}</div>
-                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Challenges</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-2 sm:p-4 text-center">
-                  <div className="flex items-center justify-center mb-1 sm:mb-2">
-                    <Target className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />
-                  </div>
-                  <div className="text-lg sm:text-2xl font-bold">{stats.totalSubmissions}</div>
-                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Submissions</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-2 sm:p-4 text-center">
-                  <div className="flex items-center justify-center mb-1 sm:mb-2">
-                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
-                  </div>
-                  <div className="text-lg sm:text-2xl font-bold">{stats.averageScore}</div>
-                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Avg Score</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-2 sm:p-4 text-center">
-                  <div className="flex items-center justify-center mb-1 sm:mb-2">
-                    <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
-                  </div>
-                  <div className="text-lg sm:text-2xl font-bold">{stats.topScore}</div>
-                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Top Score</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-2 sm:p-4 text-center">
-                  <div className="flex items-center justify-center mb-1 sm:mb-2">
-                    <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
-                  </div>
-                  <div className="text-lg sm:text-2xl font-bold">{stats.timeLeft}</div>
-                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Time Left</div>
-                </CardContent>
-              </Card>
-            </div>
 
-            <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-4">
-              <div className="flex items-center justify-between gap-2 mb-2">
-                <TabsList className="grid w-full grid-cols-3 gap-1">
-                  <TabsTrigger value="scoreboard" className="text-xs sm:text-sm">Scoreboard</TabsTrigger>
-                  <TabsTrigger value="challenges" className="text-xs sm:text-sm">Challenges</TabsTrigger>
-                  <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
-                </TabsList>
-                <button
-                  onClick={() => setAutoRotate(!autoRotate)}
-                  className={`flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 text-xs rounded-md transition-colors whitespace-nowrap ${
-                    autoRotate 
-                      ? 'bg-green-500 text-white hover:bg-green-600' 
-                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                  }`}
-                  title={autoRotate ? "Auto-rotation enabled (10s)" : "Enable auto-rotation"}
-                >
-                  <span className="hidden sm:inline">{autoRotate ? '🔄 Auto' : '▶️ Auto'}</span>
-                  <span className="sm:hidden">{autoRotate ? '🔄' : '▶️'}</span>
-                </button>
-              </div>
-
-              <TabsContent value="scoreboard" className="space-y-4">
-                <div className="flex flex-col lg:flex-row gap-4">
-                  <div className="lg:w-1/3 w-full">
-                    <RecentSubmissions
-                      submissions={submissionsData?.data || []}
-                      isLoading={submissionsLoading}
-                      isError={submissionsError}
-                      error={submissionsErrorObj}
-                      onRefresh={refetchSubmissions}
-                    />
-                  </div>
-                  <div className="lg:w-2/3 w-full">
-                    <Card className="h-full">
-                      <CardContent className="p-0 sm:p-6">
+                  <TabsContent value="scoreboard" className="space-y-3 md:space-y-4">
+                    <Card className="min-h-[500px] lg:h-[720px] flex flex-col">
+                      <CardContent className="p-2 sm:p-4 flex-1 flex flex-col">
                         {isLoading ? (
                           <div className="p-4">
                             <ScoreboardSkeleton />
@@ -419,117 +352,121 @@ export default function CTFScoreboard() {
                             <Table>
                               <TableHeader>
                                 <TableRow>
-                                  <TableHead className="w-12 sm:w-16">Rank</TableHead>
-                                  <TableHead>User</TableHead>
-                                  <TableHead className="text-right">Score</TableHead>
+                                  <TableHead className="w-12 sm:w-16 text-xs sm:text-sm">Rank</TableHead>
+                                  <TableHead className="text-xs sm:text-sm">User</TableHead>
+                                  <TableHead className="text-right text-xs sm:text-sm">Score</TableHead>
                                   <TableHead className="text-center min-w-[120px] sm:min-w-[200px]">
                                     <div className="flex items-center justify-center gap-1" title="Challenges solved">
                                       <div title="Challenges solved">
                                         <Flag className="h-3 w-3 sm:h-4 sm:w-4" />
                                       </div>
-                                      <span className="hidden sm:inline">Challenges</span>
-                                      <span className="sm:hidden text-xs">Solved</span>
+                                      <span className="text-xs sm:text-sm">Challenges</span>
                                     </div>
                                   </TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                              {users.length > 0 ? users.map((user) => (
-                                <TableRow key={user.account_id} className={user.rank <= 3 ? "bg-yellow-50 dark:bg-yellow-950/20" : ""}>
-                                  <TableCell className="font-medium">
-                                    <div className="flex items-center gap-1 sm:gap-2">
-                                      {user.rank === 1 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500" />}
-                                      {user.rank === 2 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />}
-                                      {user.rank === 3 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />}
-                                      {user.rank > 3 && `#${user.rank}`}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="font-semibold text-xs sm:text-sm">{user.name}</TableCell>
-                                  <TableCell className="text-right font-mono text-sm sm:text-lg">{user.score.toLocaleString()}</TableCell>
-                                  <TableCell className="text-center">
-                                    <div className="flex flex-wrap gap-0.5 sm:gap-1 justify-center items-center min-h-[24px] sm:min-h-[32px] max-w-lg mx-auto py-1 sm:py-2" title={`${user.solvedChallenges} challenges solved`}>
-                                      {user.solves && Array.isArray(user.solves) ? (
-                                        user.solves
-                                          .filter((solve: ScoreboardEntry['solves'][0]) => solve.challenge_id) // Extra safety check
-                                          .map((solve: ScoreboardEntry['solves'][0]) => {
-                                          const challenge = challenges?.find((c: Challenge) => c.id === solve.challenge_id);
-                                          if (!challenge) {
-                                            return null;
-                                          }
-                                          const challengeName = challenge.name;
-                                          const isFirstBlood = firstBloods.get(solve.challenge_id) === user.account_id;
-                                          return (
-                                            <div
-                                              key={solve.challenge_id}
-                                              title={`${challengeName}${isFirstBlood ? ' (First Blood!)' : ''} - Solved on ${new Date(solve.date).toLocaleString()}`}
-                                              className={`cursor-help flex items-center justify-center p-0.5 sm:p-1 rounded transition-colors ${
-                                                isFirstBlood 
-                                                  ? 'hover:bg-red-100 dark:hover:bg-red-900/20' 
-                                                  : 'hover:bg-green-100 dark:hover:bg-green-900/20'
-                                              }`}
-                                            >
-                                              {isFirstBlood ? (
-                                                <Droplets className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
-                                              ) : (
+                              {users.length > 0 ? (
+                                <>
+                                  {users.map((user) => (
+                                    <TableRow key={user.account_id} className={user.rank <= 3 ? "bg-yellow-50 dark:bg-yellow-950/20" : ""}>
+                                      <TableCell className="font-medium text-xs sm:text-sm py-1.5 sm:py-2">
+                                        <div className="flex items-center gap-1 sm:gap-2">
+                                          {user.rank === 1 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500" />}
+                                          {user.rank === 2 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />}
+                                          {user.rank === 3 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />}
+                                          {user.rank > 3 && `#${user.rank}`}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="font-semibold text-xs sm:text-sm py-1.5 sm:py-2">{user.name}</TableCell>
+                                      <TableCell className="text-right font-mono text-sm sm:text-base py-1.5 sm:py-2">{user.score.toLocaleString()}</TableCell>
+                                      <TableCell className="text-center py-1.5 sm:py-2">
+                                        <div className="flex flex-wrap gap-0.5 sm:gap-1 justify-center items-center min-h-[24px] sm:min-h-[28px] max-w-lg mx-auto py-1" title={`${user.solvedChallenges} challenges solved`}>
+                                          {user.solves && Array.isArray(user.solves) ? (
+                                            user.solves
+                                              .filter((solve: ScoreboardEntry['solves'][0]) => solve.challenge_id) // Extra safety check
+                                              .map((solve: ScoreboardEntry['solves'][0]) => {
+                                              const challenge = challenges?.find((c: Challenge) => c.id === solve.challenge_id);
+                                              if (!challenge) {
+                                                return null;
+                                              }
+                                              const challengeName = challenge.name;
+                                              const isFirstBlood = firstBloods.get(solve.challenge_id) === user.account_id;
+                                              return (
+                                                <div
+                                                  key={solve.challenge_id}
+                                                  title={`${challengeName}${isFirstBlood ? ' (First Blood!)' : ''} - Solved on ${new Date(solve.date).toLocaleString()}`}
+                                                  className={`cursor-help flex items-center justify-center p-0.5 sm:p-1 rounded transition-colors ${
+                                                    isFirstBlood 
+                                                      ? 'hover:bg-red-100 dark:hover:bg-red-900/20' 
+                                                      : 'hover:bg-green-100 dark:hover:bg-green-900/20'
+                                                  }`}
+                                                >
+                                                  {isFirstBlood ? (
+                                                    <Droplets className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
+                                                  ) : (
+                                                    <Flag className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+                                                  )}
+                                                </div>
+                                              );
+                                            })
+                                          ) : user.solvedChallenges > 0 ? (
+                                            Array.from({ length: user.solvedChallenges }, (_, i) => (
+                                              <div
+                                                key={i}
+                                                title="Challenge solved"
+                                                className="cursor-help flex items-center justify-center p-0.5 sm:p-1 hover:bg-green-100 dark:hover:bg-green-900/20 rounded transition-colors"
+                                              >
                                                 <Flag className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
-                                              )}
-                                            </div>
-                                          );
-                                        })
-                                      ) : user.solvedChallenges > 0 ? (
-                                        Array.from({ length: user.solvedChallenges }, (_, i) => (
-                                          <div
-                                            key={i}
-                                            title="Challenge solved"
-                                            className="cursor-help flex items-center justify-center p-0.5 sm:p-1 hover:bg-green-100 dark:hover:bg-green-900/20 rounded transition-colors"
-                                          >
-                                            <Flag className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
-                                          </div>
-                                        ))
-                                      ) : (
-                                        <span className="text-muted-foreground text-xs sm:text-sm">No solves</span>
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              )) : (
-                                <TableRow>
-                                  <TableCell colSpan={4} className="text-center py-8">
-                                    No scoreboard data available
-                                  </TableCell>
-                                </TableRow>
+                                              </div>
+                                            ))
+                                          ) : (
+                                            <span className="text-muted-foreground text-[10px] sm:text-sm">No solves</span>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                  {/* Add empty rows to fill up to itemsPerPage */}
+                                  {users.length < itemsPerPage && Array.from({ length: itemsPerPage - users.length }).map((_, i) => (
+                                    <TableRow key={`empty-${i}`} className="opacity-30">
+                                      <TableCell className="font-medium text-sm py-2">
+                                        <div className="flex items-center gap-2">
+                                          #{startIndex + users.length + i + 1}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell className="font-semibold text-sm text-muted-foreground py-2">—</TableCell>
+                                      <TableCell className="text-right font-mono text-base text-muted-foreground py-2">—</TableCell>
+                                      <TableCell className="text-center py-2">
+                                        <span className="text-muted-foreground text-sm">—</span>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </>
+                              ) : (
+                                Array.from({ length: itemsPerPage }).map((_, i) => (
+                                  <TableRow key={`empty-${i}`} className="opacity-30">
+                                    <TableCell className="font-medium text-sm">
+                                      <div className="flex items-center gap-2">
+                                        #{i + 1}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="font-semibold text-sm text-muted-foreground">—</TableCell>
+                                    <TableCell className="text-right font-mono text-base text-muted-foreground">—</TableCell>
+                                    <TableCell className="text-center">
+                                      <span className="text-muted-foreground text-sm">—</span>
+                                    </TableCell>
+                                  </TableRow>
+                                ))
                               )}
                             </TableBody>
                           </Table>
                           </div>
                         )}
                         {allusers.length > 0 && (
-                          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 sm:mt-6 px-2 sm:px-0">
-                            <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground w-full sm:w-auto">
-                              <span className="whitespace-nowrap">
-                                Showing {startIndex + 1} to {Math.min(endIndex, allusers.length)} of {allusers.length} users
-                              </span>
-                              <div className="flex items-center gap-2">
-                                <span className="whitespace-nowrap">Per page:</span>
-                                <Select 
-                                  value={itemsPerPage.toString()} 
-                                  onValueChange={(value) => {
-                                    setItemsPerPage(parseInt(value));
-                                    setCurrentPage(1); // Reset to first page when changing items per page
-                                  }}
-                                >
-                                  <SelectTrigger className="w-16 h-8 text-xs">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="5">5</SelectItem>
-                                    <SelectItem value="10">10</SelectItem>
-                                    <SelectItem value="20">20</SelectItem>
-                                    <SelectItem value="50">50</SelectItem>
-                                    <SelectItem value="100">100</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
+                          <div className="flex items-center justify-between gap-4 mt-4 px-2 sm:px-0">
+                            <div className="text-sm text-muted-foreground">
+                              Showing {startIndex + 1} to {Math.min(endIndex, allusers.length)} of {allusers.length} users
                             </div>
                             {allusers.length > itemsPerPage && (
                               <Pagination>
@@ -592,32 +529,30 @@ export default function CTFScoreboard() {
                         )}
                       </CardContent>
                     </Card>
-                  </div>
-                </div>
-              </TabsContent>
+                  </TabsContent>
 
-              <TabsContent value="challenges" className="space-y-4">
-                <Card>
-                  <CardHeader className="px-4 sm:px-6">
-                    <CardTitle className="text-lg sm:text-xl">Challenge Overview</CardTitle>
-                    <CardDescription className="text-xs sm:text-sm">Available challenges and solve statistics</CardDescription>
+                  <TabsContent value="challenges" className="space-y-3 md:space-y-4">
+                <Card className="min-h-[500px] lg:h-[720px] flex flex-col">
+                  <CardHeader className="px-3 sm:px-4 md:px-6 py-2">
+                    <CardTitle className="text-sm sm:text-base md:text-lg">Challenge Overview</CardTitle>
+                    <CardDescription className="text-xs">Available challenges and solve statistics</CardDescription>
                   </CardHeader>
-                  <CardContent className="px-2 sm:px-6">
+                  <CardContent className="px-2 sm:px-3 md:px-4 flex-1 overflow-auto">
                     {challengesLoading ? (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
                         {[...Array(6)].map((_, i) => (
                           <Skeleton key={i} className="h-32 w-full" />
                         ))}
                       </div>
                     ) : challengesError ? (
                       <div className="text-center text-red-500 py-8 px-4">
-                        <Flag className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-4" />
-                        <p className="text-base sm:text-lg font-semibold mb-2">Failed to load challenges</p>
-                        <p className="text-xs sm:text-sm">Please check your API configuration</p>
+                        <Flag className="h-8 w-8 mx-auto mb-3" />
+                        <p className="text-sm font-semibold mb-1">Failed to load challenges</p>
+                        <p className="text-xs">Please check your API configuration</p>
                       </div>
                     ) : allChallenges.length > 0 ? (
                       <>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 mb-3">
                           {paginatedChallenges.map((challenge) => {
                             const firstBloodInfo = firstBloodUsers.get(challenge.id);
                             
@@ -632,9 +567,9 @@ export default function CTFScoreboard() {
                         </div>
                         
                         {allChallenges.length > challengesPerPage && (
-                          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 px-2 sm:px-0">
-                            <div className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
-                              Showing {challengesStartIndex + 1} to {Math.min(challengesEndIndex, allChallenges.length)} of {allChallenges.length} challenges
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-3 px-2 sm:px-0">
+                            <div className="text-xs text-muted-foreground whitespace-nowrap">
+                              {challengesStartIndex + 1}-{Math.min(challengesEndIndex, allChallenges.length)} of {allChallenges.length} challenges
                             </div>
                             <Pagination>
                               <PaginationContent>
@@ -699,34 +634,34 @@ export default function CTFScoreboard() {
                         )}
                       </>
                     ) : (
-                      <div className="text-center py-12 text-muted-foreground">
-                        <Flag className="h-12 w-12 mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold mb-2">No Challenges Available</h3>
-                        <p>No challenges have been published yet.</p>
+                      <div className="text-center py-8 text-muted-foreground">
+                        <Flag className="h-8 w-8 mx-auto mb-3" />
+                        <h3 className="text-sm font-semibold mb-1">No Challenges Available</h3>
+                        <p className="text-xs">No challenges have been published yet.</p>
                       </div>
                     )}
                   </CardContent>
                 </Card>
               </TabsContent>
 
-              <TabsContent value="analytics" className="space-y-4">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-4">
-                  <Card>
-                    <CardHeader className="px-4 sm:px-6">
-                      <CardTitle className="text-base sm:text-lg">Top Performing Users</CardTitle>
-                      <CardDescription className="text-xs sm:text-sm">Users with highest scores</CardDescription>
+              <TabsContent value="analytics" className="space-y-3 md:space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 min-h-[500px] lg:h-[720px]">
+                  <Card className="flex flex-col">
+                    <CardHeader className="px-3 sm:px-4 py-2">
+                      <CardTitle className="text-sm sm:text-base">Top Performing Users</CardTitle>
+                      <CardDescription className="text-xs">Users with highest scores</CardDescription>
                     </CardHeader>
-                    <CardContent className="px-4 sm:px-6">
-                      <div className="space-y-2 sm:space-y-3">
+                    <CardContent className="px-3 sm:px-4">
+                      <div className="space-y-2">
                         {allusers.slice(0, 5).map((user, idx) => (
                           <div key={idx} className="flex items-center justify-between gap-2">
-                            <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-1">
-                              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                              <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></div>
                               <span className="font-medium text-xs sm:text-sm truncate">{user.name}</span>
                             </div>
-                            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                            <div className="flex items-center gap-1.5 flex-shrink-0">
                               <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{user.score} pts</span>
-                              <Badge variant="outline" className="text-xs">#{user.rank}</Badge>
+                              <Badge variant="outline" className="text-[10px] h-4">#{user.rank}</Badge>
                             </div>
                           </div>
                         ))}
@@ -734,81 +669,81 @@ export default function CTFScoreboard() {
                     </CardContent>
                   </Card>
 
-                  <Card>
-                    <CardHeader className="px-4 sm:px-6">
-                      <CardTitle className="text-base sm:text-lg">Challenge Statistics</CardTitle>
-                      <CardDescription className="text-xs sm:text-sm">Overview of challenges and solving progress</CardDescription>
+                  <Card className="flex flex-col">
+                    <CardHeader className="px-3 sm:px-4 py-2">
+                      <CardTitle className="text-sm sm:text-base">Challenge Statistics</CardTitle>
+                      <CardDescription className="text-xs">Overview of challenges and solving progress</CardDescription>
                     </CardHeader>
-                    <CardContent className="px-4 sm:px-6">
-                      <div className="space-y-3 sm:space-y-4">
-                        <div className="grid grid-cols-2 gap-2 sm:gap-4 text-center">
+                    <CardContent className="px-3 sm:px-4">
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-3 text-center">
                           <div>
-                            <div className="text-lg sm:text-2xl font-bold text-blue-600">{stats.totalChallenges}</div>
-                            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Total Challenges</div>
+                            <div className="text-lg font-bold text-blue-600">{stats.totalChallenges}</div>
+                            <div className="text-[10px] text-gray-600 dark:text-gray-400">Total Challenges</div>
                           </div>
                           <div>
-                            <div className="text-lg sm:text-2xl font-bold text-green-600">
+                            <div className="text-lg font-bold text-green-600">
                               {challenges ? Object.keys(challenges.reduce((acc, c) => ({ ...acc, [c.category]: true }), {})).length : 0}
                             </div>
-                            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Categories</div>
+                            <div className="text-[10px] text-gray-600 dark:text-gray-400">Categories</div>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-2 sm:gap-4 text-center">
+                        <div className="grid grid-cols-2 gap-3 text-center">
                           <div>
-                            <div className="text-lg sm:text-2xl font-bold text-orange-600">
+                            <div className="text-lg font-bold text-orange-600">
                               {challenges ? Math.round(challenges.reduce((sum, c) => sum + c.solves, 0) / Math.max(challenges.length, 1)) : 0}
                             </div>
-                            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Avg Solves</div>
+                            <div className="text-[10px] text-gray-600 dark:text-gray-400">Avg Solves</div>
                           </div>
                           <div>
-                            <div className="text-lg sm:text-2xl font-bold text-purple-600">
+                            <div className="text-lg font-bold text-purple-600">
                               {challenges ? Math.max(...challenges.map(c => c.solves), 0) : 0}
                             </div>
-                            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Most Solved</div>
+                            <div className="text-[10px] text-gray-600 dark:text-gray-400">Most Solved</div>
                           </div>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
 
-                  <Card>
-                    <CardHeader className="px-4 sm:px-6">
-                      <CardTitle className="text-base sm:text-lg">Competition Statistics</CardTitle>
-                      <CardDescription className="text-xs sm:text-sm">Overview of current competition state</CardDescription>
+                  <Card className="flex flex-col">
+                    <CardHeader className="px-3 sm:px-4 py-2">
+                      <CardTitle className="text-sm sm:text-base">Competition Statistics</CardTitle>
+                      <CardDescription className="text-xs">Overview of current competition state</CardDescription>
                     </CardHeader>
-                    <CardContent className="px-4 sm:px-6">
-                      <div className="space-y-3 sm:space-y-4">
-                        <div className="grid grid-cols-2 gap-4 text-center">
+                    <CardContent className="px-3 sm:px-4">
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-3 text-center">
                           <div>
-                            <div className="text-2xl font-bold text-blue-600">{stats.totalusers}</div>
-                            <div className="text-sm text-gray-600">Active Users</div>
+                            <div className="text-lg font-bold text-blue-600">{stats.totalusers}</div>
+                            <div className="text-[10px] text-gray-600">Active Users</div>
                           </div>
                           <div>
-                            <div className="text-2xl font-bold text-green-600">{stats.topScore}</div>
-                            <div className="text-sm text-gray-600">Highest Score</div>
+                            <div className="text-lg font-bold text-green-600">{stats.topScore}</div>
+                            <div className="text-[10px] text-gray-600">Highest Score</div>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 text-center">
+                        <div className="grid grid-cols-2 gap-3 text-center">
                           <div>
-                            <div className="text-2xl font-bold text-orange-600">{stats.averageScore}</div>
-                            <div className="text-sm text-gray-600">Average Score</div>
+                            <div className="text-lg font-bold text-orange-600">{stats.averageScore}</div>
+                            <div className="text-[10px] text-gray-600">Average Score</div>
                           </div>
                           <div>
-                            <div className="text-2xl font-bold text-purple-600">{stats.usersWithPoints}</div>
-                            <div className="text-sm text-gray-600">Users with Points</div>
+                            <div className="text-lg font-bold text-purple-600">{stats.usersWithPoints}</div>
+                            <div className="text-[10px] text-gray-600">Users with Points</div>
                           </div>
                         </div>
                       </div>
                     </CardContent>
                   </Card>
 
-                  <Card>
-                    <CardHeader className="px-4 sm:px-6">
-                      <CardTitle className="text-base sm:text-lg">Challenge Categories</CardTitle>
-                      <CardDescription className="text-xs sm:text-sm">Distribution of challenges by category</CardDescription>
+                  <Card className="flex flex-col">
+                    <CardHeader className="px-3 sm:px-4 py-2">
+                      <CardTitle className="text-sm sm:text-base">Challenge Categories</CardTitle>
+                      <CardDescription className="text-xs">Distribution of challenges by category</CardDescription>
                     </CardHeader>
-                    <CardContent className="px-4 sm:px-6">
-                      <div className="space-y-2 sm:space-y-3">
+                    <CardContent className="px-3 sm:px-4">
+                      <div className="space-y-2">
                         {challenges && Object.entries(
                           challenges.reduce((acc, challenge) => {
                             acc[challenge.category] = (acc[challenge.category] || 0) + 1;
@@ -829,6 +764,76 @@ export default function CTFScoreboard() {
                 </div>
               </TabsContent>
             </Tabs>
+          </div>
+
+          {/* Right Side - Stats and Submissions (Always Visible) - Compact sidebar */}
+          <div className="w-full lg:w-[30%] flex flex-col gap-3 md:gap-4 min-h-[400px] lg:h-[720px]">
+            {/* Stats Section */}
+            <Card className="flex-shrink-0">
+              <CardHeader className="px-3 sm:px-4 py-2">
+                <CardTitle className="text-sm sm:text-base">Competition Stats</CardTitle>
+              </CardHeader>
+              <CardContent className="px-3 sm:px-4 py-2">
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="text-center">
+                    <div className="flex items-center justify-center mb-1">
+                      <Users className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500" />
+                    </div>
+                    <div className="text-base sm:text-xl font-bold">{stats.totalusers}</div>
+                    <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Users</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center mb-1">
+                      <Flag className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+                    </div>
+                    <div className="text-base sm:text-xl font-bold">{stats.totalChallenges}</div>
+                    <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Challenges</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center mb-1">
+                      <Target className="h-3 w-3 sm:h-4 sm:w-4 text-purple-500" />
+                    </div>
+                    <div className="text-base sm:text-xl font-bold">{stats.totalSubmissions}</div>
+                    <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Submissions</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center mb-1">
+                      <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500" />
+                    </div>
+                    <div className="text-base sm:text-xl font-bold">{stats.averageScore}</div>
+                    <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Avg Score</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center mb-1">
+                      <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500" />
+                    </div>
+                    <div className="text-base sm:text-xl font-bold">{stats.topScore}</div>
+                    <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Top Score</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="flex items-center justify-center mb-1">
+                      <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
+                    </div>
+                    <div className="text-base sm:text-xl font-bold">{stats.timeLeft}</div>
+                    <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Time Left</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Recent Submissions Section */}
+            <div className="flex-1">
+              <RecentSubmissions
+                submissions={submissionsData?.data || []}
+                isLoading={submissionsLoading}
+                isError={submissionsError}
+                error={submissionsErrorObj}
+                onRefresh={refetchSubmissions}
+                useExternalData={true}
+              />
+            </div>
+          </div>
+        </div>
             
             {firstBloodData && (
               <FirstBloodAnimation 

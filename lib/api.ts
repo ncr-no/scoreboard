@@ -88,13 +88,19 @@ async function fetchFromCTFd<T>(endpoint: string, config: ApiConfig): Promise<T>
   // Construct the full URL - direct call to CTFd API
   const fullUrl = `${config.apiUrl}/api/v1${endpoint}`;
   
+  // Prepare headers - only add Authorization if token is provided
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (config.apiToken && config.apiToken.trim()) {
+    headers['Authorization'] = `Token ${config.apiToken}`;
+  }
+  
   const res = await fetchWithRetry(
     fullUrl,
     {
-      headers: {
-        'Authorization': `Token ${config.apiToken}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       cache: 'no-cache',
     },
     3, // 3 retries
@@ -111,6 +117,12 @@ async function fetchFromCTFd<T>(endpoint: string, config: ApiConfig): Promise<T>
       
       const retryAfter = res.headers.get('Retry-After');
       const errorMessage = `Rate limit exceeded. ${retryAfter ? `Try again after ${retryAfter} seconds.` : 'Try increasing the refetch interval in Dev Tools.'}`;
+      throw new Error(errorMessage);
+    }
+    
+    // Provide helpful error message for 401 errors
+    if (res.status === 401) {
+      const errorMessage = 'Unauthorized: Please configure your API token in the settings (⚙️ icon in top-right corner). You can generate a token in your CTFd admin panel under Settings → Security.';
       throw new Error(errorMessage);
     }
     
@@ -141,13 +153,19 @@ async function fetchSubmissionsFromCTFd(endpoint: string, config: ApiConfig): Pr
   // Construct the full URL - direct call to CTFd API
   const fullUrl = `${config.apiUrl}/api/v1${endpoint}`;
 
+  // Prepare headers - only add Authorization if token is provided
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (config.apiToken && config.apiToken.trim()) {
+    headers['Authorization'] = `Token ${config.apiToken}`;
+  }
+
   const res = await fetchWithRetry(
     fullUrl,
     {
-      headers: {
-        'Authorization': `Token ${config.apiToken}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       cache: 'no-cache',
     },
     3, // 3 retries
@@ -161,6 +179,12 @@ async function fetchSubmissionsFromCTFd(endpoint: string, config: ApiConfig): Pr
     if (res.status === 429) {
       lastRateLimitTime = Date.now();
       rateLimitCount = Math.min(rateLimitCount + 1, 5);
+    }
+    
+    // Provide helpful error message for 401 errors
+    if (res.status === 401) {
+      const errorMessage = 'Unauthorized: Please configure your API token in the settings (⚙️ icon in top-right corner). You can generate a token in your CTFd admin panel under Settings → Security.';
+      throw new Error(errorMessage);
     }
     
     throw new Error(errorData.error || `Failed to fetch ${endpoint}: ${res.statusText}`);
@@ -216,13 +240,19 @@ export const getCtfConfig = async (key: string, config: ApiConfig): Promise<stri
   try {
     const fullUrl = `${config.apiUrl}/api/v1/configs?key=${key}`;
     
+    // Prepare headers - only add Authorization if token is provided
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+    
+    if (config.apiToken && config.apiToken.trim()) {
+      headers['Authorization'] = `Token ${config.apiToken}`;
+    }
+    
     const response = await fetchWithRetry(
       fullUrl,
       {
-        headers: {
-          'Authorization': `Token ${config.apiToken}`,
-          'Content-Type': 'application/json',
-        },
+        headers,
         cache: 'no-cache',
       },
       3, // 3 retries
@@ -230,6 +260,9 @@ export const getCtfConfig = async (key: string, config: ApiConfig): Promise<stri
     );
 
     if (!response.ok) {
+      if (response.status === 401) {
+        console.warn('Unauthorized access to CTFd config. Please configure your API token.');
+      }
       return null;
     }
 
@@ -256,13 +289,19 @@ export const getCtfEnd = (config: ApiConfig): Promise<number | null> =>
 export const getChallengeSolves = async (config: ApiConfig, challengeId: number): Promise<ChallengeSolvesResponse> => {
   const fullUrl = `${config.apiUrl}/api/v1/challenges/${challengeId}/solves`;
   
+  // Prepare headers - only add Authorization if token is provided
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+  };
+  
+  if (config.apiToken && config.apiToken.trim()) {
+    headers['Authorization'] = `Token ${config.apiToken}`;
+  }
+  
   const res = await fetchWithRetry(
     fullUrl,
     {
-      headers: {
-        'Authorization': `Token ${config.apiToken}`,
-        'Content-Type': 'application/json',
-      },
+      headers,
       cache: 'no-cache',
     },
     3, // 3 retries
@@ -271,6 +310,13 @@ export const getChallengeSolves = async (config: ApiConfig, challengeId: number)
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+    
+    // Provide helpful error message for 401 errors
+    if (res.status === 401) {
+      const errorMessage = 'Unauthorized: Please configure your API token in the settings (⚙️ icon in top-right corner). You can generate a token in your CTFd admin panel under Settings → Security.';
+      throw new Error(errorMessage);
+    }
+    
     throw new Error(errorData.error || `Failed to fetch challenge solves: ${res.statusText}`);
   }
 

@@ -88,6 +88,7 @@ export function ConfigDialog() {
           variant="outline" 
           size="icon"
           className="fixed top-4 right-4 z-50 shadow-lg"
+          aria-label="Settings"
         >
           <Settings className="h-4 w-4" />
         </Button>

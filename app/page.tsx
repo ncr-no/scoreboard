@@ -21,10 +21,11 @@ import { Trophy, Flag, Users, Clock, Target, TrendingUp, Settings, Droplets } fr
 import { ConfigDialog } from '@/components/config-dialog';
 import { DynamicTitle } from '@/components/dynamic-title';
 import { ChallengeCard } from '@/components/page/challenge-card';
-import { RecentSubmissions } from '@/components/page/recent-submissions';
+import { RecentSubmissions } from '@/components/scoreboard-chart';
 import { FirstBloodAnimation } from '@/components/first-blood-animation';
 import { LiquidAnimation } from '@/components/liquid-animation';
 import { DevTools } from '@/components/dev-tools';
+import { AuthWarningBanner } from '@/components/auth-warning-banner';
 import { ScoreboardEntry, Challenge } from '@/types/ctfd';
 import { 
   Pagination,
@@ -61,8 +62,19 @@ export default function CTFScoreboard() {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [currentTab, setCurrentTab] = useState("scoreboard");
   const [autoRotate, setAutoRotate] = useState(false);
+  const [showAuthWarning, setShowAuthWarning] = useState(false);
+  const [showConfigDialog, setShowConfigDialog] = useState(false);
   const challengesPerPage = 9;
-  const tabs = ["scoreboard", "submissions", "challenges", "analytics"];
+  const tabs = ["scoreboard", "challenges", "analytics"];
+
+  // Detect authentication errors
+  useEffect(() => {
+    const hasAuthError = 
+      (isError && error?.message?.includes('Unauthorized')) ||
+      (challengesError && String(challengesError)?.includes('Unauthorized'));
+    
+    setShowAuthWarning(isConfigured && hasAuthError);
+  }, [isError, error, challengesError, isConfigured]);
 
   // Auto-rotate tabs
   useEffect(() => {
@@ -125,6 +137,11 @@ export default function CTFScoreboard() {
     
     // Filter out invalid solves - only keep solves for challenges that exist in the challenges list
     const validSolves = solves.filter((solve: ScoreboardEntry['solves'][0]) => {
+      // Filter out solves with null or undefined challenge_id
+      if (!solve.challenge_id || solve.challenge_id === null || solve.challenge_id === undefined) {
+        return false;
+      }
+      
       // If we have the challenges list, verify the challenge exists
       if (challenges && Array.isArray(challenges)) {
         return challenges.some((c: Challenge) => c.id === solve.challenge_id);
@@ -185,6 +202,11 @@ export default function CTFScoreboard() {
   const processedScoreboard = fullScoreboard ? fullScoreboard.map((entry: ScoreboardEntry) => {
     // Filter out invalid solves - only keep solves for challenges that exist in the challenges list
     const validSolves = Array.isArray(entry.solves) ? entry.solves.filter((solve: ScoreboardEntry['solves'][0]) => {
+      // Filter out solves with null or undefined challenge_id
+      if (!solve.challenge_id || solve.challenge_id === null || solve.challenge_id === undefined) {
+        return false;
+      }
+      
       if (challenges && Array.isArray(challenges)) {
         return challenges.some((c: Challenge) => c.id === solve.challenge_id);
       }
@@ -263,6 +285,18 @@ export default function CTFScoreboard() {
           </h1>
         </div>
 
+        {/* Authentication warning banner */}
+        {showAuthWarning && (
+          <AuthWarningBanner 
+            isVisible={showAuthWarning}
+            onOpenSettings={() => {
+              // Trigger the settings dialog to open
+              const settingsButton = document.querySelector('[aria-label="Settings"]') as HTMLButtonElement;
+              settingsButton?.click();
+            }}
+          />
+        )}
+
         {!isConfigured ? (
           <Card className="max-w-2xl mx-auto">
             <CardContent className="text-center py-16">
@@ -337,9 +371,8 @@ export default function CTFScoreboard() {
 
             <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-4">
               <div className="flex items-center justify-between gap-2 mb-2">
-                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1">
+                <TabsList className="grid w-full grid-cols-3 gap-1">
                   <TabsTrigger value="scoreboard" className="text-xs sm:text-sm">Scoreboard</TabsTrigger>
-                  <TabsTrigger value="submissions" className="text-xs sm:text-sm">Submissions</TabsTrigger>
                   <TabsTrigger value="challenges" className="text-xs sm:text-sm">Challenges</TabsTrigger>
                   <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
                 </TabsList>
@@ -358,200 +391,202 @@ export default function CTFScoreboard() {
               </div>
 
               <TabsContent value="scoreboard" className="space-y-4">
-                <Card>
-                  <CardContent className="p-0 sm:p-6">
-                    {isLoading ? (
-                      <div className="p-4">
-                        <ScoreboardSkeleton />
-                      </div>
-                    ) : isError ? (
-                      <div className="text-center text-red-500 py-8 px-4">
-                        <p className="text-base sm:text-lg font-semibold mb-2">Failed to load scoreboard</p>
-                        <p className="text-xs sm:text-sm">{error?.message}</p>
-                      </div>
-                    ) : (
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-12 sm:w-16">Rank</TableHead>
-                              <TableHead>User</TableHead>
-                              <TableHead className="text-right">Score</TableHead>
-                              <TableHead className="text-center min-w-[120px] sm:min-w-[200px]">
-                                <div className="flex items-center justify-center gap-1" title="Challenges solved">
-                                  <div title="Challenges solved">
-                                    <Flag className="h-3 w-3 sm:h-4 sm:w-4" />
-                                  </div>
-                                  <span className="hidden sm:inline">Challenges</span>
-                                  <span className="sm:hidden text-xs">Solved</span>
-                                </div>
-                              </TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                          {users.length > 0 ? users.map((user) => (
-                            <TableRow key={user.account_id} className={user.rank <= 3 ? "bg-yellow-50 dark:bg-yellow-950/20" : ""}>
-                              <TableCell className="font-medium">
-                                <div className="flex items-center gap-1 sm:gap-2">
-                                  {user.rank === 1 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500" />}
-                                  {user.rank === 2 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />}
-                                  {user.rank === 3 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />}
-                                  {user.rank > 3 && `#${user.rank}`}
-                                </div>
-                              </TableCell>
-                              <TableCell className="font-semibold text-xs sm:text-sm">{user.name}</TableCell>
-                              <TableCell className="text-right font-mono text-sm sm:text-lg">{user.score.toLocaleString()}</TableCell>
-                              <TableCell className="text-center">
-                                <div className="flex flex-wrap gap-0.5 sm:gap-1 justify-center items-center min-h-[24px] sm:min-h-[32px] max-w-lg mx-auto py-1 sm:py-2" title={`${user.solvedChallenges} challenges solved`}>
-                                  {user.solves && Array.isArray(user.solves) ? (
-                                    user.solves.map((solve: ScoreboardEntry['solves'][0]) => {
-                                      const challenge = challenges?.find((c: Challenge) => c.id === solve.challenge_id);
-                                      const challengeName = challenge?.name || `Challenge ${solve.challenge_id}`;
-                                      const isFirstBlood = firstBloods.get(solve.challenge_id) === user.account_id;
-                                      
-                                      return (
-                                        <div
-                                          key={solve.challenge_id}
-                                          title={`${challengeName}${isFirstBlood ? ' (First Blood!)' : ''} - Solved on ${new Date(solve.date).toLocaleString()}`}
-                                          className={`cursor-help flex items-center justify-center p-0.5 sm:p-1 rounded transition-colors ${
-                                            isFirstBlood 
-                                              ? 'hover:bg-red-100 dark:hover:bg-red-900/20' 
-                                              : 'hover:bg-green-100 dark:hover:bg-green-900/20'
-                                          }`}
-                                        >
-                                          {isFirstBlood ? (
-                                            <Droplets className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
-                                          ) : (
-                                            <Flag className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
-                                          )}
-                                        </div>
-                                      );
-                                    })
-                                  ) : user.solvedChallenges > 0 ? (
-                                    Array.from({ length: user.solvedChallenges }, (_, i) => (
-                                      <div
-                                        key={i}
-                                        title="Challenge solved"
-                                        className="cursor-help flex items-center justify-center p-0.5 sm:p-1 hover:bg-green-100 dark:hover:bg-green-900/20 rounded transition-colors"
-                                      >
-                                        <Flag className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
-                                      </div>
-                                    ))
-                                  ) : (
-                                    <span className="text-muted-foreground text-xs sm:text-sm">No solves</span>
-                                  )}
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          )) : (
-                            <TableRow>
-                              <TableCell colSpan={4} className="text-center py-8">
-                                No scoreboard data available
-                              </TableCell>
-                            </TableRow>
-                          )}
-                        </TableBody>
-                      </Table>
-                      </div>
-                    )}
-                    
-                    {allusers.length > 0 && (
-                      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-4 sm:mt-6 px-4 sm:px-0">
-                        <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                          <span>
-                            Showing {startIndex + 1} to {Math.min(endIndex, allusers.length)} of {allusers.length} users
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span className="whitespace-nowrap">Per page:</span>
-                            <Select 
-                              value={itemsPerPage.toString()} 
-                              onValueChange={(value) => {
-                                setItemsPerPage(parseInt(value));
-                                setCurrentPage(1); // Reset to first page when changing items per page
-                              }}
-                            >
-                              <SelectTrigger className="w-16 h-8 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="5">5</SelectItem>
-                                <SelectItem value="10">10</SelectItem>
-                                <SelectItem value="20">20</SelectItem>
-                                <SelectItem value="50">50</SelectItem>
-                                <SelectItem value="100">100</SelectItem>
-                              </SelectContent>
-                            </Select>
+                <div className="flex flex-col lg:flex-row gap-4">
+                  <div className="lg:w-1/3 w-full">
+                    <RecentSubmissions />
+                  </div>
+                  <div className="lg:w-2/3 w-full">
+                    <Card className="h-full">
+                      <CardContent className="p-0 sm:p-6">
+                        {isLoading ? (
+                          <div className="p-4">
+                            <ScoreboardSkeleton />
                           </div>
-                        </div>
-                        {allusers.length > itemsPerPage && (
-                          <Pagination>
-                            <PaginationContent>
-                              <PaginationItem>
-                                <PaginationPrevious 
-                                  href="#"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    if (currentPage > 1) handlePageChange(currentPage - 1);
+                        ) : isError ? (
+                          <div className="text-center text-red-500 py-8 px-4">
+                            <p className="text-base sm:text-lg font-semibold mb-2">Failed to load scoreboard</p>
+                            <p className="text-xs sm:text-sm">{error?.message}</p>
+                          </div>
+                        ) : (
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead className="w-12 sm:w-16">Rank</TableHead>
+                                  <TableHead>User</TableHead>
+                                  <TableHead className="text-right">Score</TableHead>
+                                  <TableHead className="text-center min-w-[120px] sm:min-w-[200px]">
+                                    <div className="flex items-center justify-center gap-1" title="Challenges solved">
+                                      <div title="Challenges solved">
+                                        <Flag className="h-3 w-3 sm:h-4 sm:w-4" />
+                                      </div>
+                                      <span className="hidden sm:inline">Challenges</span>
+                                      <span className="sm:hidden text-xs">Solved</span>
+                                    </div>
+                                  </TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                              {users.length > 0 ? users.map((user) => (
+                                <TableRow key={user.account_id} className={user.rank <= 3 ? "bg-yellow-50 dark:bg-yellow-950/20" : ""}>
+                                  <TableCell className="font-medium">
+                                    <div className="flex items-center gap-1 sm:gap-2">
+                                      {user.rank === 1 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500" />}
+                                      {user.rank === 2 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />}
+                                      {user.rank === 3 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />}
+                                      {user.rank > 3 && `#${user.rank}`}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="font-semibold text-xs sm:text-sm">{user.name}</TableCell>
+                                  <TableCell className="text-right font-mono text-sm sm:text-lg">{user.score.toLocaleString()}</TableCell>
+                                  <TableCell className="text-center">
+                                    <div className="flex flex-wrap gap-0.5 sm:gap-1 justify-center items-center min-h-[24px] sm:min-h-[32px] max-w-lg mx-auto py-1 sm:py-2" title={`${user.solvedChallenges} challenges solved`}>
+                                      {user.solves && Array.isArray(user.solves) ? (
+                                        user.solves
+                                          .filter((solve: ScoreboardEntry['solves'][0]) => solve.challenge_id) // Extra safety check
+                                          .map((solve: ScoreboardEntry['solves'][0]) => {
+                                          const challenge = challenges?.find((c: Challenge) => c.id === solve.challenge_id);
+                                          if (!challenge) {
+                                            return null;
+                                          }
+                                          const challengeName = challenge.name;
+                                          const isFirstBlood = firstBloods.get(solve.challenge_id) === user.account_id;
+                                          return (
+                                            <div
+                                              key={solve.challenge_id}
+                                              title={`${challengeName}${isFirstBlood ? ' (First Blood!)' : ''} - Solved on ${new Date(solve.date).toLocaleString()}`}
+                                              className={`cursor-help flex items-center justify-center p-0.5 sm:p-1 rounded transition-colors ${
+                                                isFirstBlood 
+                                                  ? 'hover:bg-red-100 dark:hover:bg-red-900/20' 
+                                                  : 'hover:bg-green-100 dark:hover:bg-green-900/20'
+                                              }`}
+                                            >
+                                              {isFirstBlood ? (
+                                                <Droplets className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
+                                              ) : (
+                                                <Flag className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+                                              )}
+                                            </div>
+                                          );
+                                        })
+                                      ) : user.solvedChallenges > 0 ? (
+                                        Array.from({ length: user.solvedChallenges }, (_, i) => (
+                                          <div
+                                            key={i}
+                                            title="Challenge solved"
+                                            className="cursor-help flex items-center justify-center p-0.5 sm:p-1 hover:bg-green-100 dark:hover:bg-green-900/20 rounded transition-colors"
+                                          >
+                                            <Flag className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <span className="text-muted-foreground text-xs sm:text-sm">No solves</span>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              )) : (
+                                <TableRow>
+                                  <TableCell colSpan={4} className="text-center py-8">
+                                    No scoreboard data available
+                                  </TableCell>
+                                </TableRow>
+                              )}
+                            </TableBody>
+                          </Table>
+                          </div>
+                        )}
+                        {allusers.length > 0 && (
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 sm:mt-6 px-2 sm:px-0">
+                            <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground w-full sm:w-auto">
+                              <span className="whitespace-nowrap">
+                                Showing {startIndex + 1} to {Math.min(endIndex, allusers.length)} of {allusers.length} users
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <span className="whitespace-nowrap">Per page:</span>
+                                <Select 
+                                  value={itemsPerPage.toString()} 
+                                  onValueChange={(value) => {
+                                    setItemsPerPage(parseInt(value));
+                                    setCurrentPage(1); // Reset to first page when changing items per page
                                   }}
-                                  className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
-                                />
-                              </PaginationItem>
-                              
-                              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                                let pageNum;
-                                if (totalPages <= 5) {
-                                  pageNum = i + 1;
-                                } else if (currentPage <= 3) {
-                                  pageNum = i + 1;
-                                } else if (currentPage >= totalPages - 2) {
-                                  pageNum = totalPages - 4 + i;
-                                } else {
-                                  pageNum = currentPage - 2 + i;
-                                }
-                                
-                                return (
-                                  <PaginationItem key={pageNum}>
-                                    <PaginationLink
+                                >
+                                  <SelectTrigger className="w-16 h-8 text-xs">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="5">5</SelectItem>
+                                    <SelectItem value="10">10</SelectItem>
+                                    <SelectItem value="20">20</SelectItem>
+                                    <SelectItem value="50">50</SelectItem>
+                                    <SelectItem value="100">100</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                            {allusers.length > itemsPerPage && (
+                              <Pagination>
+                                <PaginationContent>
+                                  <PaginationItem key="prev">
+                                    <PaginationPrevious 
                                       href="#"
                                       onClick={(e) => {
                                         e.preventDefault();
-                                        handlePageChange(pageNum);
+                                        if (currentPage > 1) handlePageChange(currentPage - 1);
                                       }}
-                                      isActive={currentPage === pageNum}
-                                    >
-                                      {pageNum}
-                                    </PaginationLink>
+                                      className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                                    />
                                   </PaginationItem>
-                                );
-                              })}
-                              
-                              {totalPages > 5 && currentPage < totalPages - 2 && (
-                                <PaginationItem>
-                                  <PaginationEllipsis />
-                                </PaginationItem>
-                              )}
-                              
-                              <PaginationItem>
-                                <PaginationNext 
-                                  href="#"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    if (currentPage < totalPages) handlePageChange(currentPage + 1);
-                                  }}
-                                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
-                                />
-                              </PaginationItem>
-                            </PaginationContent>
-                          </Pagination>
+                                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                                    let pageNum;
+                                    if (totalPages <= 5) {
+                                      pageNum = i + 1;
+                                    } else if (currentPage <= 3) {
+                                      pageNum = i + 1;
+                                    } else if (currentPage >= totalPages - 2) {
+                                      pageNum = totalPages - 4 + i;
+                                    } else {
+                                      pageNum = currentPage - 2 + i;
+                                    }
+                                    return (
+                                      <PaginationItem key={pageNum}>
+                                        <PaginationLink
+                                          href="#"
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            handlePageChange(pageNum);
+                                          }}
+                                          isActive={currentPage === pageNum}
+                                        >
+                                          {pageNum}
+                                        </PaginationLink>
+                                      </PaginationItem>
+                                    );
+                                  })}
+                                  {totalPages > 5 && currentPage < totalPages - 2 && (
+                                    <PaginationItem key="ellipsis">
+                                      <PaginationEllipsis />
+                                    </PaginationItem>
+                                  )}
+                                  <PaginationItem key="next">
+                                    <PaginationNext 
+                                      href="#"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        if (currentPage < totalPages) handlePageChange(currentPage + 1);
+                                      }}
+                                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                                    />
+                                  </PaginationItem>
+                                </PaginationContent>
+                              </Pagination>
+                            )}
+                          </div>
                         )}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="submissions" className="space-y-4">
-                <RecentSubmissions />
+                      </CardContent>
+                    </Card>
+                  </div>
+                </div>
               </TabsContent>
 
               <TabsContent value="challenges" className="space-y-4">
@@ -590,13 +625,13 @@ export default function CTFScoreboard() {
                         </div>
                         
                         {allChallenges.length > challengesPerPage && (
-                          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-2 sm:px-0">
-                            <div className="text-xs sm:text-sm text-muted-foreground">
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 px-2 sm:px-0">
+                            <div className="text-xs sm:text-sm text-muted-foreground whitespace-nowrap">
                               Showing {challengesStartIndex + 1} to {Math.min(challengesEndIndex, allChallenges.length)} of {allChallenges.length} challenges
                             </div>
                             <Pagination>
                               <PaginationContent>
-                                <PaginationItem>
+                                <PaginationItem key="prev-challenges">
                                   <PaginationPrevious 
                                     href="#"
                                     onClick={(e) => {
@@ -636,12 +671,12 @@ export default function CTFScoreboard() {
                                 })}
                                 
                                 {totalChallengesPages > 5 && challengesPage < totalChallengesPages - 2 && (
-                                  <PaginationItem>
+                                  <PaginationItem key="ellipsis-challenges">
                                     <PaginationEllipsis />
                                   </PaginationItem>
                                 )}
                                 
-                                <PaginationItem>
+                                <PaginationItem key="next-challenges">
                                   <PaginationNext 
                                     href="#"
                                     onClick={(e) => {

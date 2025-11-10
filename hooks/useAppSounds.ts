@@ -26,18 +26,22 @@ export function useAppSounds(): AppSounds {
   useEffect(() => {
     if (!isClient) return;
 
-    // Dynamically import use-sound only on the client
-    const loadSounds = async () => {
-      const { default: useSound } = await import('use-sound');
-      
-      const [playSuccess] = useSound(SUCCESS_SOUND);
-      const [playError] = useSound(ERROR_SOUND);
-      const [playFirstBlood] = useSound(FIRST_BLOOD_SOUND, { volume: 0.8 });
-
-      setSounds({ playSuccess, playError, playFirstBlood });
+    // Use the Web Audio API directly for client-side sound playback
+    const createAudioPlayer = (src: string, volume = 1.0) => {
+      return () => {
+        const audio = new Audio(src);
+        audio.volume = volume;
+        audio.play().catch((error) => {
+          console.warn('Audio playback failed:', error);
+        });
+      };
     };
 
-    loadSounds();
+    setSounds({
+      playSuccess: createAudioPlayer(SUCCESS_SOUND),
+      playError: createAudioPlayer(ERROR_SOUND),
+      playFirstBlood: createAudioPlayer(FIRST_BLOOD_SOUND, 0.8),
+    });
   }, [isClient]);
 
   return sounds;

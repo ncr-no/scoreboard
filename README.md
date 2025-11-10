@@ -88,11 +88,26 @@ A modern, real-time CTF (Capture The Flag) scoreboard application built with Nex
 
 ### Configuration
 
-On first launch, click the settings icon to configure your CTFd connection:
+On first launch, click the settings icon (⚙️) in the top-right corner to configure your CTFd connection:
 
-- **CTFd API URL**: Your CTFd instance URL (e.g., `https://ctfd.example.com`)
-- **API Token**: Generate from your CTFd admin panel
+- **CTFd API URL**: Your CTFd instance URL (e.g., `https://ctf.ncr-external.iaas.iik.ntnu.no`)
+- **API Token**: Generate from your CTFd admin panel (see below)
 - **Refresh Interval**: How often to poll for updates (5-300 seconds)
+- **Top Teams Count**: Number of teams to display (10-100)
+
+#### Getting Your API Token
+
+If you're getting **401 Unauthorized errors**, you need to configure an API token:
+
+1. **Log into your CTFd instance** as an admin
+2. Navigate to **Admin Panel** → **Settings** → **Security**
+3. Scroll to the **API** section
+4. **Generate a new token** or copy an existing one
+5. **Paste the token** into the configuration dialog in this application
+
+The application will show a warning banner when authentication is required with instructions on how to fix it.
+
+> **Note**: Some CTFd instances may allow public access to scoreboard data. If your instance requires authentication, you must configure an API token.
 
 ## 🏗️ Architecture
 
@@ -219,6 +234,67 @@ npm run build
 > Data stored in localStorage (including your API token) can be accessed by any script running on the same origin.  
 > **Do not use this application on shared or public computers unless you clear localStorage after use.**  
 > To clear, open your browser's developer tools and run: `localStorage.clear();`
+
+## 🔧 Troubleshooting
+
+### 401 Unauthorized Errors
+
+If you see **HTTP 401** errors in your browser console:
+
+```
+GET https://your-ctfd-instance.com/api/v1/scoreboard [HTTP/2 401]
+GET https://your-ctfd-instance.com/api/v1/challenges [HTTP/2 401]
+```
+
+**Solution:**
+1. Your CTFd instance requires authentication
+2. Click the **Settings icon (⚙️)** in the top-right corner
+3. Enter your **CTFd API URL** and **API Token**
+4. Get your API token from: **Admin Panel** → **Settings** → **Security** in your CTFd instance
+
+The application will display a helpful warning banner when authentication is required.
+
+### CORS Errors
+
+If you see CORS errors in your console:
+
+```
+Access to fetch at 'https://your-ctfd-instance.com' from origin 'http://localhost:3000' has been blocked by CORS policy
+```
+
+**Solution:**
+1. Configure your CTFd instance to allow requests from your application's origin
+2. Add your domain to CTFd's CORS allowlist
+3. This is typically done in CTFd's `config.py` or via reverse proxy (nginx, etc.)
+
+### Rate Limiting Issues
+
+If you see **HTTP 429** (Too Many Requests) errors:
+
+**Solution:**
+1. Open **Settings** (⚙️) and increase the **Refresh Interval**
+2. Reduce the **Top Teams Count** (higher values = more API calls)
+3. The application has built-in retry logic with exponential backoff
+
+### Data Not Updating
+
+If the scoreboard isn't refreshing:
+
+**Solution:**
+1. Check your **Refresh Interval** in settings
+2. Verify your CTFd instance is accessible
+3. Check browser console for errors
+4. Try manually refreshing the page
+
+### Configuration Not Saving
+
+If your settings don't persist after refresh:
+
+**Solution:**
+1. Check that localStorage is enabled in your browser
+2. Clear your browser cache and try again
+3. Ensure you're not in incognito/private mode (some browsers restrict localStorage)
+
 ## 🤝 Contributing
 
 Contributions are welcome! Please feel free to submit issues, feature requests, or pull requests.

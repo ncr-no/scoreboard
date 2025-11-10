@@ -17,16 +17,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trophy, Flag, Users, Clock, Target, TrendingUp, Settings, Droplets } from "lucide-react";
+import { Trophy, Flag, Users, Clock, Target, TrendingUp, Settings, Droplets, CheckCircle } from "lucide-react";
 import { ConfigDialog } from '@/components/config-dialog';
 import { DynamicTitle } from '@/components/dynamic-title';
 import { ChallengeCard } from '@/components/page/challenge-card';
+import { ChallengeDetailView } from '@/components/page/challenge-detail-view';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { RecentSubmissions } from '@/components/scoreboard-chart';
 import { FirstBloodAnimation } from '@/components/first-blood-animation';
 import { LiquidAnimation } from '@/components/liquid-animation';
 import { DevTools } from '@/components/dev-tools';
 import { AuthWarningBanner } from '@/components/auth-warning-banner';
+import { Podium } from '@/components/podium';
 import { ScoreboardEntry, Challenge } from '@/types/ctfd';
+import { getCategoryDotColor, getCategoryColor } from '@/lib/utils';
 import { 
   Pagination,
   PaginationContent,
@@ -42,10 +46,23 @@ export default function CTFScoreboard() {
   const { data: scoreboardResponse, isLoading, isError, error } = useScoreboard();
   const { data: fullScoreboard } = useFullScoreboard();
   const { data: challenges, isLoading: challengesLoading, isError: challengesError } = useChallenges();
-  // Fetch all recent submissions for RecentSubmissions
+  // Fetch latest submissions for RecentSubmissions
+  // First get metadata to calculate last page
+  const { data: submissionsMetaData, refetch: refetchMeta } = useSubmissions({
+    type: 'correct',
+    per_page: 1, // Just to get metadata
+  });
+  
+  // Calculate last page to get most recent submissions
+  const totalSubmissions = submissionsMetaData?.meta?.pagination?.total || 0;
+  const perPage = 50;
+  const lastPage = totalSubmissions > 0 ? Math.max(1, Math.ceil(totalSubmissions / perPage)) : 1;
+  
+  // Fetch the last page (most recent submissions)
   const { data: submissionsData, isLoading: submissionsLoading, isError: submissionsError, error: submissionsErrorObj, refetch: refetchSubmissions } = useSubmissions({
     type: 'correct',
-    per_page: 50,
+    per_page: perPage,
+    page: lastPage,
   });
   const { data: ctfName, isLoading: ctfNameLoading } = useCtfName();
   const { data: endTime, isLoading: endTimeLoading } = useCtfEnd();
@@ -62,10 +79,11 @@ export default function CTFScoreboard() {
   const [firstBloodUsers, setFirstBloodUsers] = useState<Map<number, {id: number, name: string}>>(new Map());
   const [itemsPerPage] = useState(10);
   const [currentTab, setCurrentTab] = useState("scoreboard");
-  const [autoRotate, setAutoRotate] = useState(false);
   const [showAuthWarning, setShowAuthWarning] = useState(false);
   const [showConfigDialog, setShowConfigDialog] = useState(false);
-  const challengesPerPage = 6;
+  const [selectedChallengeId, setSelectedChallengeId] = useState<number | null>(null);
+  const [refreshCountdown, setRefreshCountdown] = useState(0);
+  const challengesPerPage = 10; // Match itemsPerPage for consistent height
   const tabs = ["scoreboard", "challenges", "analytics"];
 
   // Detect authentication errors
@@ -79,7 +97,7 @@ export default function CTFScoreboard() {
 
   // Auto-rotate tabs
   useEffect(() => {
-    if (!autoRotate || !isConfigured) return;
+    if (!config.autoRotate || !isConfigured) return;
     
     const rotationInterval = setInterval(() => {
       setCurrentTab((prevTab) => {
@@ -90,7 +108,26 @@ export default function CTFScoreboard() {
     }, 10000); // Rotate every 10 seconds
 
     return () => clearInterval(rotationInterval);
-  }, [autoRotate, isConfigured]);
+  }, [config.autoRotate, isConfigured]);
+
+  // Refresh countdown timer
+  useEffect(() => {
+    if (!isConfigured) return;
+
+    const intervalSeconds = Math.floor(config.refetchInterval / 1000);
+    setRefreshCountdown(intervalSeconds);
+
+    const countdownInterval = setInterval(() => {
+      setRefreshCountdown((prev) => {
+        if (prev <= 1) {
+          return intervalSeconds; // Reset to full interval
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(countdownInterval);
+  }, [config.refetchInterval, isConfigured]);
 
   useEffect(() => {
     if (!challenges || !Array.isArray(challenges)) return;
@@ -258,30 +295,32 @@ export default function CTFScoreboard() {
   };
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
+    <div className="h-screen overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 flex flex-col">
       <DynamicTitle />
-      <div className="max-w-[1920px] mx-auto py-3 px-3 sm:px-6">
-        <div className="text-center mb-3 relative">
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2">
-            {ctfNameLoading ? (
-              <Skeleton className="h-8 sm:h-10 w-48 sm:w-64 mx-auto" />
-            ) : (
-              ctfName || 'CTF Scoreboard'
-            )}
-          </h1>
-          <div className="absolute top-0 right-0 flex items-center gap-1 sm:gap-2">
-            {isConfigured && (
-              <div className="hidden sm:flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                <span>Auto-refresh: {config.refetchInterval / 1000}s</span>
-              </div>
-            )}
-            {process.env.NEXT_PUBLIC_SHOW_DEVTOOLS === 'true' && (
-              <DevTools />
-            )}
-            <ConfigDialog />
+      {/* Maximize screen usage - remove max-width constraints */}
+      <div className="w-full flex-1 min-h-0 flex flex-col">
+        <div className="px-2 sm:px-3 md:px-4 lg:px-5 xl:px-6 flex-shrink-0">
+          <div className="text-center py-3 sm:py-4 md:py-5 lg:py-6 relative">
+            <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl font-bold text-gray-900 dark:text-white">
+              {ctfNameLoading ? (
+                <Skeleton className="h-8 sm:h-10 lg:h-14 xl:h-16 2xl:h-20 w-48 sm:w-64 lg:w-80 xl:w-96 2xl:w-[32rem] mx-auto" />
+              ) : (
+                ctfName || 'CTF Scoreboard'
+              )}
+            </h1>
+            <div className="absolute top-2 sm:top-3 md:top-4 right-2 sm:right-3 md:right-4 lg:right-5 xl:right-6 flex items-center gap-2 sm:gap-2.5 md:gap-3">
+              {isConfigured && (
+                <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 text-[10px] sm:text-xs md:text-sm lg:text-base text-muted-foreground bg-muted px-2 sm:px-2.5 md:px-3 lg:px-3.5 py-1 sm:py-1.5 md:py-2 rounded-full shadow-sm">
+                  <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 md:w-2.5 md:h-2.5 bg-green-500 rounded-full animate-pulse flex-shrink-0"></div>
+                  <span className="font-medium tabular-nums">{refreshCountdown}s</span>
+                </div>
+              )}
+              {process.env.NEXT_PUBLIC_SHOW_DEVTOOLS === 'true' && (
+                <DevTools />
+              )}
+              <ConfigDialog />
+            </div>
           </div>
-        </div>
 
         {/* Authentication warning banner */}
         {showAuthWarning && (
@@ -311,56 +350,42 @@ export default function CTFScoreboard() {
         ) : (
           <>
             {/* Main Layout: Left (Tabs Content) and Right (Stats + Submissions - Always Visible) */}
-            <div className="flex flex-col lg:flex-row gap-3 md:gap-4">
+            <div className="flex flex-col lg:flex-row gap-1 sm:gap-1.5 md:gap-2 lg:gap-2.5 flex-1 min-h-0">
               {/* Left Side - Tabbed Content (Scoreboard/Challenges/Analytics) - Takes more space */}
-              <div className="w-full lg:w-[70%]">
-                <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-3 md:space-y-4">
-                  <div className="flex items-center justify-between gap-2 mb-2">
-                    <TabsList className="grid w-full grid-cols-3 gap-1">
-                      <TabsTrigger value="scoreboard" className="text-xs sm:text-sm">Scoreboard</TabsTrigger>
-                      <TabsTrigger value="challenges" className="text-xs sm:text-sm">Challenges</TabsTrigger>
-                      <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
+              <div className="w-full lg:w-[65%] flex flex-col min-h-0">
+                <Tabs value={currentTab} onValueChange={setCurrentTab} className="flex flex-col flex-1 min-h-0">
+                  <div className="mb-1 sm:mb-1.5 flex-shrink-0">
+                    <TabsList className="grid w-full grid-cols-3 gap-0.5 sm:gap-1 h-6 sm:h-7 md:h-8 lg:h-9 xl:h-10">
+                      <TabsTrigger value="scoreboard" className="text-[10px] sm:text-xs md:text-sm lg:text-base truncate">Scoreboard</TabsTrigger>
+                      <TabsTrigger value="challenges" className="text-[10px] sm:text-xs md:text-sm lg:text-base truncate">Challenges</TabsTrigger>
+                      <TabsTrigger value="analytics" className="text-[10px] sm:text-xs md:text-sm lg:text-base truncate">Analytics</TabsTrigger>
                     </TabsList>
-                    <button
-                      onClick={() => setAutoRotate(!autoRotate)}
-                      className={`flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 text-xs rounded-md transition-colors whitespace-nowrap ${
-                        autoRotate 
-                          ? 'bg-green-500 text-white hover:bg-green-600' 
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
-                      }`}
-                      title={autoRotate ? "Auto-rotation enabled (10s)" : "Enable auto-rotation"}
-                    >
-                      <span className="hidden sm:inline">{autoRotate ? '🔄 Auto' : '▶️ Auto'}</span>
-                      <span className="sm:hidden">{autoRotate ? '🔄' : '▶️'}</span>
-                    </button>
                   </div>
 
-                  <TabsContent value="scoreboard" className="space-y-3 md:space-y-4">
-                    <Card className="min-h-[500px] lg:h-[720px] flex flex-col">
-                      <CardContent className="p-2 sm:p-4 flex-1 flex flex-col">
+                  <TabsContent value="scoreboard" className="flex-1 min-h-0 flex flex-col mt-1 sm:mt-1.5">
+                    <Card className="flex-1 min-h-0 flex flex-col">
+                      <CardContent className="p-1.5 sm:p-2 md:p-2.5 lg:p-3 xl:p-4 flex-1 flex flex-col min-h-0 overflow-hidden">
                         {isLoading ? (
-                          <div className="p-4">
+                          <div className="p-2 sm:p-3">
                             <ScoreboardSkeleton />
                           </div>
                         ) : isError ? (
-                          <div className="text-center text-red-500 py-8 px-4">
-                            <p className="text-base sm:text-lg font-semibold mb-2">Failed to load scoreboard</p>
-                            <p className="text-xs sm:text-sm">{error?.message}</p>
+                          <div className="text-center text-red-500 py-8 px-4 lg:py-12 xl:py-16 2xl:py-20">
+                            <p className="text-base sm:text-lg lg:text-xl xl:text-2xl 2xl:text-3xl font-semibold mb-2 2xl:mb-4">Failed to load scoreboard</p>
+                            <p className="text-xs sm:text-sm lg:text-base xl:text-lg 2xl:text-xl">{error?.message}</p>
                           </div>
                         ) : (
-                          <div className="overflow-x-auto">
-                            <Table>
-                              <TableHeader>
-                                <TableRow>
-                                  <TableHead className="w-12 sm:w-16 text-xs sm:text-sm">Rank</TableHead>
-                                  <TableHead className="text-xs sm:text-sm">User</TableHead>
-                                  <TableHead className="text-right text-xs sm:text-sm">Score</TableHead>
-                                  <TableHead className="text-center min-w-[120px] sm:min-w-[200px]">
-                                    <div className="flex items-center justify-center gap-1" title="Challenges solved">
-                                      <div title="Challenges solved">
-                                        <Flag className="h-3 w-3 sm:h-4 sm:w-4" />
-                                      </div>
-                                      <span className="text-xs sm:text-sm">Challenges</span>
+                          <div className="flex-1 min-h-0 overflow-auto">
+                            <Table className="w-full">
+                              <TableHeader className="sticky top-0 bg-background z-10">
+                                <TableRow className="h-7 sm:h-8 md:h-9 lg:h-10">
+                                  <TableHead className="w-8 sm:w-10 md:w-12 lg:w-14 text-[10px] sm:text-xs md:text-sm lg:text-base">Rank</TableHead>
+                                  <TableHead className="text-[10px] sm:text-xs md:text-sm lg:text-base min-w-0 max-w-[80px] sm:max-w-none">User</TableHead>
+                                  <TableHead className="text-right text-[10px] sm:text-xs md:text-sm lg:text-base w-12 sm:w-16 md:w-20">Score</TableHead>
+                                  <TableHead className="text-center min-w-[60px] sm:min-w-[80px] md:min-w-[120px] lg:min-w-[150px] xl:min-w-[200px]">
+                                    <div className="flex items-center justify-center gap-0.5 sm:gap-1" title="Challenges solved">
+                                      <Flag className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 lg:h-4 lg:w-4" />
+                                      <span className="hidden sm:inline text-[10px] sm:text-xs md:text-sm lg:text-base">Challenges</span>
                                     </div>
                                   </TableHead>
                                 </TableRow>
@@ -369,19 +394,19 @@ export default function CTFScoreboard() {
                               {users.length > 0 ? (
                                 <>
                                   {users.map((user) => (
-                                    <TableRow key={user.account_id} className={user.rank <= 3 ? "bg-yellow-50 dark:bg-yellow-950/20" : ""}>
-                                      <TableCell className="font-medium text-xs sm:text-sm py-1.5 sm:py-2">
-                                        <div className="flex items-center gap-1 sm:gap-2">
-                                          {user.rank === 1 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500" />}
-                                          {user.rank === 2 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />}
-                                          {user.rank === 3 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />}
+                                    <TableRow key={user.account_id} className={`${user.rank <= 3 ? "bg-yellow-50 dark:bg-yellow-950/20" : ""} h-7 sm:h-8 md:h-9 lg:h-10`}>
+                                      <TableCell className="font-medium text-[10px] sm:text-xs md:text-sm lg:text-base py-1 sm:py-1.5 md:py-2">
+                                        <div className="flex items-center gap-0.5 sm:gap-1">
+                                          {user.rank === 1 && <Trophy className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 lg:h-4 lg:w-4 text-yellow-500" />}
+                                          {user.rank === 2 && <Trophy className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 lg:h-4 lg:w-4 text-gray-400" />}
+                                          {user.rank === 3 && <Trophy className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 lg:h-4 lg:w-4 text-amber-600" />}
                                           {user.rank > 3 && `#${user.rank}`}
                                         </div>
                                       </TableCell>
-                                      <TableCell className="font-semibold text-xs sm:text-sm py-1.5 sm:py-2">{user.name}</TableCell>
-                                      <TableCell className="text-right font-mono text-sm sm:text-base py-1.5 sm:py-2">{user.score.toLocaleString()}</TableCell>
-                                      <TableCell className="text-center py-1.5 sm:py-2">
-                                        <div className="flex flex-wrap gap-0.5 sm:gap-1 justify-center items-center min-h-[24px] sm:min-h-[28px] max-w-lg mx-auto py-1" title={`${user.solvedChallenges} challenges solved`}>
+                                      <TableCell className="font-semibold text-[10px] sm:text-xs md:text-sm lg:text-base py-1 sm:py-1.5 md:py-2 min-w-0 max-w-[80px] sm:max-w-none truncate">{user.name}</TableCell>
+                                      <TableCell className="text-right font-mono text-[10px] sm:text-xs md:text-sm lg:text-base py-1 sm:py-1.5 md:py-2">{user.score.toLocaleString()}</TableCell>
+                                      <TableCell className="text-center py-1 sm:py-1.5 md:py-2 min-w-0">
+                                        <div className="flex flex-wrap gap-0.5 sm:gap-0.5 md:gap-1 justify-center items-center min-h-[16px] sm:min-h-[20px] md:min-h-[24px] max-w-full mx-auto" title={`${user.solvedChallenges} challenges solved`}>
                                           {user.solves && Array.isArray(user.solves) ? (
                                             user.solves
                                               .filter((solve: ScoreboardEntry['solves'][0]) => solve.challenge_id) // Extra safety check
@@ -396,16 +421,16 @@ export default function CTFScoreboard() {
                                                 <div
                                                   key={solve.challenge_id}
                                                   title={`${challengeName}${isFirstBlood ? ' (First Blood!)' : ''} - Solved on ${new Date(solve.date).toLocaleString()}`}
-                                                  className={`cursor-help flex items-center justify-center p-0.5 sm:p-1 rounded transition-colors ${
+                                                  className={`cursor-help flex items-center justify-center p-0.5 rounded transition-colors ${
                                                     isFirstBlood 
                                                       ? 'hover:bg-red-100 dark:hover:bg-red-900/20' 
                                                       : 'hover:bg-green-100 dark:hover:bg-green-900/20'
                                                   }`}
                                                 >
                                                   {isFirstBlood ? (
-                                                    <Droplets className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
+                                                    <Droplets className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 lg:h-4 lg:w-4 text-red-500" />
                                                   ) : (
-                                                    <Flag className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+                                                    <Flag className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 lg:h-4 lg:w-4 text-green-500" />
                                                   )}
                                                 </div>
                                               );
@@ -415,9 +440,9 @@ export default function CTFScoreboard() {
                                               <div
                                                 key={i}
                                                 title="Challenge solved"
-                                                className="cursor-help flex items-center justify-center p-0.5 sm:p-1 hover:bg-green-100 dark:hover:bg-green-900/20 rounded transition-colors"
+                                                className="cursor-help flex items-center justify-center p-0.5 hover:bg-green-100 dark:hover:bg-green-900/20 rounded transition-colors"
                                               >
-                                                <Flag className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
+                                                <Flag className="h-2 w-2 sm:h-2.5 sm:w-2.5 md:h-3 md:w-3 text-green-500" />
                                               </div>
                                             ))
                                           ) : (
@@ -464,66 +489,68 @@ export default function CTFScoreboard() {
                           </div>
                         )}
                         {allusers.length > 0 && (
-                          <div className="flex items-center justify-between gap-4 mt-4 px-2 sm:px-0">
-                            <div className="text-sm text-muted-foreground">
+                          <div className="flex flex-col sm:flex-row items-center sm:items-center sm:justify-between gap-2 sm:gap-3 mt-1 sm:mt-1.5 px-1 sm:px-2 flex-shrink-0 border-t pt-1 sm:pt-1.5">
+                            <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground order-2 sm:order-1 text-center sm:text-left">
                               Showing {startIndex + 1} to {Math.min(endIndex, allusers.length)} of {allusers.length} users
                             </div>
                             {allusers.length > itemsPerPage && (
-                              <Pagination>
-                                <PaginationContent>
-                                  <PaginationItem key="prev">
-                                    <PaginationPrevious 
-                                      href="#"
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        if (currentPage > 1) handlePageChange(currentPage - 1);
-                                      }}
-                                      className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
-                                    />
-                                  </PaginationItem>
-                                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                                    let pageNum;
-                                    if (totalPages <= 5) {
-                                      pageNum = i + 1;
-                                    } else if (currentPage <= 3) {
-                                      pageNum = i + 1;
-                                    } else if (currentPage >= totalPages - 2) {
-                                      pageNum = totalPages - 4 + i;
-                                    } else {
-                                      pageNum = currentPage - 2 + i;
-                                    }
-                                    return (
-                                      <PaginationItem key={pageNum}>
-                                        <PaginationLink
-                                          href="#"
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            handlePageChange(pageNum);
-                                          }}
-                                          isActive={currentPage === pageNum}
-                                        >
-                                          {pageNum}
-                                        </PaginationLink>
-                                      </PaginationItem>
-                                    );
-                                  })}
-                                  {totalPages > 5 && currentPage < totalPages - 2 && (
-                                    <PaginationItem key="ellipsis">
-                                      <PaginationEllipsis />
+                              <div className="order-1 sm:order-2 w-full sm:w-auto flex justify-center overflow-x-auto">
+                                <Pagination className="w-auto">
+                                  <PaginationContent className="flex-wrap sm:flex-nowrap">
+                                    <PaginationItem key="prev">
+                                      <PaginationPrevious 
+                                        href="#"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          if (currentPage > 1) handlePageChange(currentPage - 1);
+                                        }}
+                                        className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                                      />
                                     </PaginationItem>
-                                  )}
-                                  <PaginationItem key="next">
-                                    <PaginationNext 
-                                      href="#"
-                                      onClick={(e) => {
-                                        e.preventDefault();
-                                        if (currentPage < totalPages) handlePageChange(currentPage + 1);
-                                      }}
-                                      className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
-                                    />
-                                  </PaginationItem>
-                                </PaginationContent>
-                              </Pagination>
+                                    {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                                      let pageNum;
+                                      if (totalPages <= 5) {
+                                        pageNum = i + 1;
+                                      } else if (currentPage <= 3) {
+                                        pageNum = i + 1;
+                                      } else if (currentPage >= totalPages - 2) {
+                                        pageNum = totalPages - 4 + i;
+                                      } else {
+                                        pageNum = currentPage - 2 + i;
+                                      }
+                                      return (
+                                        <PaginationItem key={pageNum}>
+                                          <PaginationLink
+                                            href="#"
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              handlePageChange(pageNum);
+                                            }}
+                                            isActive={currentPage === pageNum}
+                                          >
+                                            {pageNum}
+                                          </PaginationLink>
+                                        </PaginationItem>
+                                      );
+                                    })}
+                                    {totalPages > 5 && currentPage < totalPages - 2 && (
+                                      <PaginationItem key="ellipsis">
+                                        <PaginationEllipsis />
+                                      </PaginationItem>
+                                    )}
+                                    <PaginationItem key="next">
+                                      <PaginationNext 
+                                        href="#"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          if (currentPage < totalPages) handlePageChange(currentPage + 1);
+                                        }}
+                                        className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                                      />
+                                    </PaginationItem>
+                                  </PaginationContent>
+                                </Pagination>
+                              </div>
                             )}
                           </div>
                         )}
@@ -531,105 +558,200 @@ export default function CTFScoreboard() {
                     </Card>
                   </TabsContent>
 
-                  <TabsContent value="challenges" className="space-y-3 md:space-y-4">
-                <Card className="min-h-[500px] lg:h-[720px] flex flex-col">
-                  <CardHeader className="px-3 sm:px-4 md:px-6 py-2">
-                    <CardTitle className="text-sm sm:text-base md:text-lg">Challenge Overview</CardTitle>
-                    <CardDescription className="text-xs">Available challenges and solve statistics</CardDescription>
-                  </CardHeader>
-                  <CardContent className="px-2 sm:px-3 md:px-4 flex-1 overflow-auto">
+                  <TabsContent value="challenges" className="flex-1 min-h-0 flex flex-col mt-1 sm:mt-1.5">
+                <Card className="flex-1 min-h-0 flex flex-col">
+                  <CardContent className="p-1.5 sm:p-2 md:p-2.5 lg:p-3 xl:p-4 flex-1 flex flex-col min-h-0 overflow-hidden">
                     {challengesLoading ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
-                        {[...Array(6)].map((_, i) => (
-                          <Skeleton key={i} className="h-32 w-full" />
+                      <div className="space-y-1 sm:space-y-1.5">
+                        {[...Array(12)].map((_, i) => (
+                          <Skeleton key={i} className="h-12 sm:h-14 w-full" />
                         ))}
                       </div>
                     ) : challengesError ? (
-                      <div className="text-center text-red-500 py-8 px-4">
-                        <Flag className="h-8 w-8 mx-auto mb-3" />
-                        <p className="text-sm font-semibold mb-1">Failed to load challenges</p>
-                        <p className="text-xs">Please check your API configuration</p>
+                      <div className="text-center text-red-500 py-6 sm:py-8 px-4">
+                        <Flag className="h-6 w-6 sm:h-8 sm:w-8 mx-auto mb-2 sm:mb-3" />
+                        <p className="text-xs sm:text-sm font-semibold mb-1">Failed to load challenges</p>
+                        <p className="text-[10px] sm:text-xs">Please check your API configuration</p>
                       </div>
                     ) : allChallenges.length > 0 ? (
                       <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 mb-3">
-                          {paginatedChallenges.map((challenge) => {
-                            const firstBloodInfo = firstBloodUsers.get(challenge.id);
-                            
-                            return (
-                              <ChallengeCard 
-                                key={challenge.id} 
-                                challenge={challenge}
-                                firstBloodUser={firstBloodInfo}
-                              />
-                            );
-                          })}
+                        <div className="flex-1 min-h-0 overflow-auto">
+                          <Table>
+                            <TableHeader className="sticky top-0 bg-background z-10">
+                              <TableRow className="h-7 sm:h-8 md:h-9 lg:h-10">
+                                <TableHead className="text-[10px] sm:text-xs md:text-sm lg:text-base min-w-0">Challenge</TableHead>
+                                <TableHead className="text-center text-[10px] sm:text-xs md:text-sm lg:text-base w-20 sm:w-24 md:w-28">Category</TableHead>
+                                <TableHead className="text-right text-[10px] sm:text-xs md:text-sm lg:text-base w-16 sm:w-20">Points</TableHead>
+                                <TableHead className="text-center text-[10px] sm:text-xs md:text-sm lg:text-base w-20 sm:w-24">Solves</TableHead>
+                                <TableHead className="text-center text-[10px] sm:text-xs md:text-sm lg:text-base w-24 sm:w-28 hidden sm:table-cell">First Blood</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {paginatedChallenges.length > 0 ? (
+                                <>
+                                  {paginatedChallenges.map((challenge) => {
+                                    const firstBloodInfo = firstBloodUsers.get(challenge.id);
+                                    const isSolved = challenge.solved_by_me;
+                                    
+                                    return (
+                                      <TableRow 
+                                        key={challenge.id} 
+                                        className={`h-7 sm:h-8 md:h-9 lg:h-10 cursor-pointer hover:bg-accent/50 ${isSolved ? 'bg-green-50/50 dark:bg-green-950/10' : ''}`}
+                                        onClick={() => setSelectedChallengeId(challenge.id)}
+                                      >
+                                        <TableCell className="py-1 sm:py-1.5 md:py-2 min-w-0">
+                                          <div className="flex items-center gap-1 sm:gap-1.5 min-w-0">
+                                            <span className="font-medium text-[10px] sm:text-xs md:text-sm lg:text-base truncate">{challenge.name}</span>
+                                            {isSolved && (
+                                              <CheckCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 lg:h-4 lg:w-4 text-green-500 flex-shrink-0" />
+                                            )}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell className="py-1 sm:py-1.5 md:py-2 text-center">
+                                          <Badge className={`${getCategoryColor(challenge.category)} text-[9px] sm:text-[10px] md:text-xs px-1.5 sm:px-2 py-0.5`}>
+                                            {challenge.category}
+                                          </Badge>
+                                        </TableCell>
+                                        <TableCell className="py-1 sm:py-1.5 md:py-2 text-right">
+                                          <span className="font-mono font-semibold text-[10px] sm:text-xs md:text-sm lg:text-base text-primary">
+                                            {challenge.value > 0 ? challenge.value : (
+                                              <Badge variant="secondary" className="text-[9px] sm:text-[10px]">Practice</Badge>
+                                            )}
+                                          </span>
+                                        </TableCell>
+                                        <TableCell className="py-1 sm:py-1.5 md:py-2 text-center">
+                                          <div className="flex items-center justify-center gap-1 text-[10px] sm:text-xs md:text-sm text-muted-foreground">
+                                            <Users className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 lg:h-4 lg:w-4 flex-shrink-0" />
+                                            <span>{challenge.solves || 0}</span>
+                                          </div>
+                                        </TableCell>
+                                        <TableCell className="py-1 sm:py-1.5 md:py-2 text-center hidden sm:table-cell">
+                                          {firstBloodInfo ? (
+                                            <div className="flex items-center justify-center gap-1 text-[9px] sm:text-[10px] md:text-xs text-red-500">
+                                              <Droplets className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
+                                              <span className="truncate max-w-[80px] sm:max-w-[100px] md:max-w-[120px]">{firstBloodInfo.name}</span>
+                                            </div>
+                                          ) : (
+                                            <span className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground">—</span>
+                                          )}
+                                        </TableCell>
+                                      </TableRow>
+                                    );
+                                  })}
+                                  {/* Add empty rows to fill up to challengesPerPage for consistent height */}
+                                  {paginatedChallenges.length < challengesPerPage && Array.from({ length: challengesPerPage - paginatedChallenges.length }).map((_, i) => (
+                                    <TableRow key={`empty-${i}`} className="opacity-30 h-7 sm:h-8 md:h-9 lg:h-10">
+                                      <TableCell className="font-medium text-[10px] sm:text-xs md:text-sm lg:text-base py-1 sm:py-1.5 md:py-2">
+                                        <span className="text-muted-foreground">—</span>
+                                      </TableCell>
+                                      <TableCell className="text-center py-1 sm:py-1.5 md:py-2">
+                                        <span className="text-muted-foreground text-[10px] sm:text-xs">—</span>
+                                      </TableCell>
+                                      <TableCell className="text-right py-1 sm:py-1.5 md:py-2">
+                                        <span className="text-muted-foreground text-[10px] sm:text-xs">—</span>
+                                      </TableCell>
+                                      <TableCell className="text-center py-1 sm:py-1.5 md:py-2">
+                                        <span className="text-muted-foreground text-[10px] sm:text-xs">—</span>
+                                      </TableCell>
+                                      <TableCell className="text-center py-1 sm:py-1.5 md:py-2 hidden sm:table-cell">
+                                        <span className="text-muted-foreground text-[10px] sm:text-xs">—</span>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))}
+                                </>
+                              ) : (
+                                Array.from({ length: challengesPerPage }).map((_, i) => (
+                                  <TableRow key={`empty-${i}`} className="opacity-30 h-7 sm:h-8 md:h-9 lg:h-10">
+                                    <TableCell className="font-medium text-[10px] sm:text-xs md:text-sm lg:text-base py-1 sm:py-1.5 md:py-2">
+                                      <span className="text-muted-foreground">—</span>
+                                    </TableCell>
+                                    <TableCell className="text-center py-1 sm:py-1.5 md:py-2">
+                                      <span className="text-muted-foreground text-[10px] sm:text-xs">—</span>
+                                    </TableCell>
+                                    <TableCell className="text-right py-1 sm:py-1.5 md:py-2">
+                                      <span className="text-muted-foreground text-[10px] sm:text-xs">—</span>
+                                    </TableCell>
+                                    <TableCell className="text-center py-1 sm:py-1.5 md:py-2">
+                                      <span className="text-muted-foreground text-[10px] sm:text-xs">—</span>
+                                    </TableCell>
+                                    <TableCell className="text-center py-1 sm:py-1.5 md:py-2 hidden sm:table-cell">
+                                      <span className="text-muted-foreground text-[10px] sm:text-xs">—</span>
+                                    </TableCell>
+                                  </TableRow>
+                                ))
+                              )}
+                            </TableBody>
+                          </Table>
                         </div>
                         
-                        {allChallenges.length > challengesPerPage && (
-                          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-3 px-2 sm:px-0">
-                            <div className="text-xs text-muted-foreground whitespace-nowrap">
+                        {allChallenges.length > 0 && (
+                          <div className="flex flex-col sm:flex-row items-center sm:items-center sm:justify-between gap-2 sm:gap-3 mt-1 sm:mt-1.5 px-1 sm:px-2 flex-shrink-0 border-t pt-1 sm:pt-1.5">
+                            <div className="text-[10px] sm:text-xs md:text-sm text-muted-foreground order-2 sm:order-1 text-center sm:text-left">
                               {challengesStartIndex + 1}-{Math.min(challengesEndIndex, allChallenges.length)} of {allChallenges.length} challenges
                             </div>
-                            <Pagination>
-                              <PaginationContent>
-                                <PaginationItem key="prev-challenges">
-                                  <PaginationPrevious 
-                                    href="#"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      if (challengesPage > 1) handleChallengesPageChange(challengesPage - 1);
-                                    }}
-                                    className={challengesPage === 1 ? "pointer-events-none opacity-50" : ""}
-                                  />
-                                </PaginationItem>
-                                
-                                {Array.from({ length: Math.min(totalChallengesPages, 5) }, (_, i) => {
-                                  let pageNum;
-                                  if (totalChallengesPages <= 5) {
-                                    pageNum = i + 1;
-                                  } else if (challengesPage <= 3) {
-                                    pageNum = i + 1;
-                                  } else if (challengesPage >= totalChallengesPages - 2) {
-                                    pageNum = totalChallengesPages - 4 + i;
-                                  } else {
-                                    pageNum = challengesPage - 2 + i;
-                                  }
-                                  
-                                  return (
-                                    <PaginationItem key={pageNum}>
-                                      <PaginationLink
+                            {allChallenges.length > challengesPerPage && (
+                              <div className="order-1 sm:order-2 w-full sm:w-auto flex justify-center overflow-x-auto">
+                                <Pagination className="w-auto">
+                                  <PaginationContent className="flex-wrap sm:flex-nowrap">
+                                    <PaginationItem key="prev-challenges">
+                                      <PaginationPrevious 
                                         href="#"
                                         onClick={(e) => {
                                           e.preventDefault();
-                                          handleChallengesPageChange(pageNum);
+                                          if (challengesPage > 1) handleChallengesPageChange(challengesPage - 1);
                                         }}
-                                        isActive={challengesPage === pageNum}
-                                      >
-                                        {pageNum}
-                                      </PaginationLink>
+                                        className={challengesPage === 1 ? "pointer-events-none opacity-50" : ""}
+                                      />
                                     </PaginationItem>
-                                  );
-                                })}
-                                
-                                {totalChallengesPages > 5 && challengesPage < totalChallengesPages - 2 && (
-                                  <PaginationItem key="ellipsis-challenges">
-                                    <PaginationEllipsis />
-                                  </PaginationItem>
-                                )}
-                                
-                                <PaginationItem key="next-challenges">
-                                  <PaginationNext 
-                                    href="#"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      if (challengesPage < totalChallengesPages) handleChallengesPageChange(challengesPage + 1);
-                                    }}
-                                    className={challengesPage === totalChallengesPages ? "pointer-events-none opacity-50" : ""}
-                                  />
-                                </PaginationItem>
-                              </PaginationContent>
-                            </Pagination>
+                                    
+                                    {Array.from({ length: Math.min(totalChallengesPages, 5) }, (_, i) => {
+                                      let pageNum;
+                                      if (totalChallengesPages <= 5) {
+                                        pageNum = i + 1;
+                                      } else if (challengesPage <= 3) {
+                                        pageNum = i + 1;
+                                      } else if (challengesPage >= totalChallengesPages - 2) {
+                                        pageNum = totalChallengesPages - 4 + i;
+                                      } else {
+                                        pageNum = challengesPage - 2 + i;
+                                      }
+                                      
+                                      return (
+                                        <PaginationItem key={pageNum}>
+                                          <PaginationLink
+                                            href="#"
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              handleChallengesPageChange(pageNum);
+                                            }}
+                                            isActive={challengesPage === pageNum}
+                                          >
+                                            {pageNum}
+                                          </PaginationLink>
+                                        </PaginationItem>
+                                      );
+                                    })}
+                                    
+                                    {totalChallengesPages > 5 && challengesPage < totalChallengesPages - 2 && (
+                                      <PaginationItem key="ellipsis-challenges">
+                                        <PaginationEllipsis />
+                                      </PaginationItem>
+                                    )}
+                                    
+                                    <PaginationItem key="next-challenges">
+                                      <PaginationNext 
+                                        href="#"
+                                        onClick={(e) => {
+                                          e.preventDefault();
+                                          if (challengesPage < totalChallengesPages) handleChallengesPageChange(challengesPage + 1);
+                                        }}
+                                        className={challengesPage === totalChallengesPages ? "pointer-events-none opacity-50" : ""}
+                                      />
+                                    </PaginationItem>
+                                  </PaginationContent>
+                                </Pagination>
+                              </div>
+                            )}
                           </div>
                         )}
                       </>
@@ -644,14 +766,14 @@ export default function CTFScoreboard() {
                 </Card>
               </TabsContent>
 
-              <TabsContent value="analytics" className="space-y-3 md:space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3 min-h-[500px] lg:h-[720px]">
-                  <Card className="flex flex-col">
-                    <CardHeader className="px-3 sm:px-4 py-2">
-                      <CardTitle className="text-sm sm:text-base">Top Performing Users</CardTitle>
-                      <CardDescription className="text-xs">Users with highest scores</CardDescription>
+              <TabsContent value="analytics" className="flex-1 min-h-0 flex flex-col mt-1 sm:mt-1.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2 flex-1 min-h-0 overflow-auto">
+                  <Card className="flex flex-col h-full">
+                    <CardHeader className="px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 flex-shrink-0">
+                      <CardTitle className="text-xs sm:text-sm md:text-base">Top Performing Users</CardTitle>
+                      <CardDescription className="text-[10px] sm:text-xs">Users with highest scores</CardDescription>
                     </CardHeader>
-                    <CardContent className="px-3 sm:px-4">
+                    <CardContent className="px-2 sm:px-3 md:px-4 flex-1">
                       <div className="space-y-2">
                         {allusers.slice(0, 5).map((user, idx) => (
                           <div key={idx} className="flex items-center justify-between gap-2">
@@ -669,12 +791,12 @@ export default function CTFScoreboard() {
                     </CardContent>
                   </Card>
 
-                  <Card className="flex flex-col">
-                    <CardHeader className="px-3 sm:px-4 py-2">
-                      <CardTitle className="text-sm sm:text-base">Challenge Statistics</CardTitle>
-                      <CardDescription className="text-xs">Overview of challenges and solving progress</CardDescription>
+                  <Card className="flex flex-col h-full">
+                    <CardHeader className="px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 flex-shrink-0">
+                      <CardTitle className="text-xs sm:text-sm md:text-base">Challenge Statistics</CardTitle>
+                      <CardDescription className="text-[10px] sm:text-xs">Overview of challenges and solving progress</CardDescription>
                     </CardHeader>
-                    <CardContent className="px-3 sm:px-4">
+                    <CardContent className="px-2 sm:px-3 md:px-4 flex-1">
                       <div className="space-y-2">
                         <div className="grid grid-cols-2 gap-3 text-center">
                           <div>
@@ -706,12 +828,12 @@ export default function CTFScoreboard() {
                     </CardContent>
                   </Card>
 
-                  <Card className="flex flex-col">
-                    <CardHeader className="px-3 sm:px-4 py-2">
-                      <CardTitle className="text-sm sm:text-base">Competition Statistics</CardTitle>
-                      <CardDescription className="text-xs">Overview of current competition state</CardDescription>
+                  <Card className="flex flex-col h-full">
+                    <CardHeader className="px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 flex-shrink-0">
+                      <CardTitle className="text-xs sm:text-sm md:text-base">Competition Statistics</CardTitle>
+                      <CardDescription className="text-[10px] sm:text-xs">Overview of current competition state</CardDescription>
                     </CardHeader>
-                    <CardContent className="px-3 sm:px-4">
+                    <CardContent className="px-2 sm:px-3 md:px-4 flex-1">
                       <div className="space-y-2">
                         <div className="grid grid-cols-2 gap-3 text-center">
                           <div>
@@ -737,12 +859,12 @@ export default function CTFScoreboard() {
                     </CardContent>
                   </Card>
 
-                  <Card className="flex flex-col">
-                    <CardHeader className="px-3 sm:px-4 py-2">
-                      <CardTitle className="text-sm sm:text-base">Challenge Categories</CardTitle>
-                      <CardDescription className="text-xs">Distribution of challenges by category</CardDescription>
+                  <Card className="flex flex-col h-full">
+                    <CardHeader className="px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 flex-shrink-0">
+                      <CardTitle className="text-xs sm:text-sm md:text-base">Challenge Categories</CardTitle>
+                      <CardDescription className="text-[10px] sm:text-xs">Distribution of challenges by category</CardDescription>
                     </CardHeader>
-                    <CardContent className="px-3 sm:px-4">
+                    <CardContent className="px-2 sm:px-3 md:px-4 flex-1">
                       <div className="space-y-2">
                         {challenges && Object.entries(
                           challenges.reduce((acc, challenge) => {
@@ -752,7 +874,7 @@ export default function CTFScoreboard() {
                         ).map(([category, count]) => (
                           <div key={category} className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-1">
-                              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-purple-500 rounded-full flex-shrink-0"></div>
+                              <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 ${getCategoryDotColor(category)} rounded-full flex-shrink-0`}></div>
                               <span className="font-medium text-xs sm:text-sm truncate">{category}</span>
                             </div>
                             <Badge variant="outline" className="text-xs flex-shrink-0">{count} challenges</Badge>
@@ -766,69 +888,28 @@ export default function CTFScoreboard() {
             </Tabs>
           </div>
 
-          {/* Right Side - Stats and Submissions (Always Visible) - Compact sidebar */}
-          <div className="w-full lg:w-[30%] flex flex-col gap-3 md:gap-4 min-h-[400px] lg:h-[720px]">
-            {/* Stats Section */}
-            <Card className="flex-shrink-0">
-              <CardHeader className="px-3 sm:px-4 py-2">
-                <CardTitle className="text-sm sm:text-base">Competition Stats</CardTitle>
-              </CardHeader>
-              <CardContent className="px-3 sm:px-4 py-2">
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="text-center">
-                    <div className="flex items-center justify-center mb-1">
-                      <Users className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500" />
-                    </div>
-                    <div className="text-base sm:text-xl font-bold">{stats.totalusers}</div>
-                    <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Users</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center mb-1">
-                      <Flag className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
-                    </div>
-                    <div className="text-base sm:text-xl font-bold">{stats.totalChallenges}</div>
-                    <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Challenges</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center mb-1">
-                      <Target className="h-3 w-3 sm:h-4 sm:w-4 text-purple-500" />
-                    </div>
-                    <div className="text-base sm:text-xl font-bold">{stats.totalSubmissions}</div>
-                    <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Submissions</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center mb-1">
-                      <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500" />
-                    </div>
-                    <div className="text-base sm:text-xl font-bold">{stats.averageScore}</div>
-                    <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Avg Score</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center mb-1">
-                      <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500" />
-                    </div>
-                    <div className="text-base sm:text-xl font-bold">{stats.topScore}</div>
-                    <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Top Score</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="flex items-center justify-center mb-1">
-                      <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
-                    </div>
-                    <div className="text-base sm:text-xl font-bold">{stats.timeLeft}</div>
-                    <div className="text-[10px] sm:text-xs text-gray-600 dark:text-gray-400">Time Left</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
+          {/* Right Side - Recent Submissions (Always Visible) - Compact sidebar */}
+          <div className="w-full lg:w-[35%] flex flex-col gap-1 sm:gap-1.5 md:gap-2 min-h-0">
+            {/* Podium for Top 3 */}
+            <div className="flex-shrink-0">
+              <Podium 
+                topThree={allusers.filter(user => user.rank <= 3).sort((a, b) => a.rank - b.rank)}
+                isLoading={isLoading}
+              />
+            </div>
+            
             {/* Recent Submissions Section */}
-            <div className="flex-1">
+            <div className="flex-1 min-h-0">
               <RecentSubmissions
                 submissions={submissionsData?.data || []}
                 isLoading={submissionsLoading}
                 isError={submissionsError}
                 error={submissionsErrorObj}
-                onRefresh={refetchSubmissions}
+                onRefresh={async () => {
+                  // Refetch metadata first to recalculate last page, then refetch submissions
+                  await refetchMeta();
+                  refetchSubmissions();
+                }}
                 useExternalData={true}
               />
             </div>
@@ -852,8 +933,21 @@ export default function CTFScoreboard() {
                 newLeader={firstPlaceChangeData.newLeader}
               />
             )}
+            
+            {/* Challenge Detail Dialog */}
+            <Dialog open={selectedChallengeId !== null} onOpenChange={(open) => !open && setSelectedChallengeId(null)}>
+              <DialogContent className="w-[95vw] sm:max-w-[625px] max-h-[90vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>
+                    {selectedChallengeId && allChallenges.find(c => c.id === selectedChallengeId)?.name || 'Challenge Details'}
+                  </DialogTitle>
+                </DialogHeader>
+                {selectedChallengeId && <ChallengeDetailView challengeId={selectedChallengeId} />}
+              </DialogContent>
+            </Dialog>
           </>
         )}
+        </div>
       </div>
     </div>
   );
@@ -861,10 +955,10 @@ export default function CTFScoreboard() {
 
 function ScoreboardSkeleton() {
   return (
-    <div className="space-y-2">
-      <Skeleton className="h-12 w-full" />
+    <div className="space-y-1 sm:space-y-1.5">
+      <Skeleton className="h-7 sm:h-8 md:h-9 lg:h-10 w-full" />
       {[...Array(10)].map((_, i) => (
-        <Skeleton key={i} className="h-10 w-full" />
+        <Skeleton key={i} className="h-7 sm:h-8 md:h-9 lg:h-10 w-full" />
       ))}
     </div>
   );

@@ -339,3 +339,124 @@
   fill: none;
   animation: dashOffset 2s ease-in-out forwards;
 }
+
+/* Podium Animation Keyframes */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes floatPodium {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-4px) rotate(1deg);
+  }
+  50% {
+    transform: translateY(0) rotate(0deg);
+  }
+  75% {
+    transform: translateY(4px) rotate(-1deg);
+  }
+}
+
+@keyframes glowGold {
+  0%, 100% {
+    box-shadow: 
+      0 12px 24px rgba(255, 215, 0, 0.4),
+      0 0 20px rgba(255, 215, 0, 0.3),
+      inset 0 2px 4px rgba(255, 255, 255, 0.5),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+  }
+  50% {
+    box-shadow: 
+      0 12px 24px rgba(255, 215, 0, 0.6),
+      0 0 30px rgba(255, 215, 0, 0.5),
+      inset 0 2px 4px rgba(255, 255, 255, 0.6),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+  }
+}
+
+@keyframes glowSilver {
+  0%, 100% {
+    box-shadow: 
+      0 8px 16px rgba(192, 192, 192, 0.3),
+      0 0 15px rgba(192, 192, 192, 0.2),
+      inset 0 2px 4px rgba(255, 255, 255, 0.3),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+  }
+  50% {
+    box-shadow: 
+      0 8px 16px rgba(192, 192, 192, 0.4),
+      0 0 20px rgba(192, 192, 192, 0.3),
+      inset 0 2px 4px rgba(255, 255, 255, 0.4),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.2);
+  }
+}
+
+@keyframes glowBronze {
+  0%, 100% {
+    box-shadow: 
+      0 8px 16px rgba(205, 127, 50, 0.3),
+      0 0 15px rgba(205, 127, 50, 0.2),
+      inset 0 2px 4px rgba(255, 255, 255, 0.2),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.3);
+  }
+  50% {
+    box-shadow: 
+      0 8px 16px rgba(205, 127, 50, 0.4),
+      0 0 20px rgba(205, 127, 50, 0.3),
+      inset 0 2px 4px rgba(255, 255, 255, 0.3),
+      inset 0 -2px 4px rgba(0, 0, 0, 0.3);
+  }
+}
+
+@keyframes countUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.podium-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.4) 45%,
+    rgba(255, 255, 255, 0.6) 50%,
+    rgba(255, 255, 255, 0.4) 55%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 3s infinite;
+  mix-blend-mode: overlay;
+}
+
+.podium-float {
+  animation: floatPodium 4s ease-in-out infinite;
+}
+
+.podium-glow-gold {
+  animation: glowGold 3s ease-in-out infinite;
+}
+
+.podium-glow-silver {
+  animation: glowSilver 3s ease-in-out infinite;
+}
+
+.podium-glow-bronze {
+  animation: glowBronze 3s ease-in-out infinite;
+}
+
+.score-count {
+  animation: countUp 0.5s ease-out;
+}

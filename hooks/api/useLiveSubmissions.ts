@@ -6,8 +6,9 @@ import type { Submission } from '@/types/ctfd';
 /**
  * Custom hook for fetching the latest submissions in real-time
  * Always returns the most recent submissions sorted by date (newest first)
+ * @param enabled - Whether the hook should be enabled (default: true)
  */
-export function useLiveSubmissions() {
+export function useLiveSubmissions(enabled: boolean = true) {
   const { config } = useConfig();
   const [lastPage, setLastPage] = useState(1);
   const [perPage, setPerPage] = useState(20);
@@ -19,16 +20,17 @@ export function useLiveSubmissions() {
   } = useSubmissions({
     type: 'correct',
     per_page: 20,
+    enabled,
   });
 
   // Calculate the last page based on total count
   useEffect(() => {
-    if (metaData?.meta?.pagination?.total) {
+    if (enabled && metaData?.meta?.pagination?.total) {
       const totalSubmissions = metaData.meta.pagination.total;
       const calculatedLastPage = Math.max(1, Math.ceil(totalSubmissions / perPage));
       setLastPage(calculatedLastPage);
     }
-  }, [metaData, perPage]);
+  }, [metaData, perPage, enabled]);
 
   // Fetch the actual submissions with the last page
   const {
@@ -41,6 +43,7 @@ export function useLiveSubmissions() {
     type: 'correct',
     per_page: perPage,
     page: lastPage,
+    enabled,
   });
 
   // Process submissions to ensure proper sorting (newest first)

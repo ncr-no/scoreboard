@@ -8,6 +8,7 @@ import type { Submission } from '@/types/ctfd';
 import { useState } from "react";
 import { useLiveSubmissions } from '@/hooks/api/useLiveSubmissions';
 import { useConfig } from '@/contexts/config-context';
+import { getCategoryColor } from '@/lib/utils';
 
 interface RecentSubmissionsProps {
 	submissions?: Submission[];
@@ -26,11 +27,13 @@ export function RecentSubmissions({
 	onRefresh: externalOnRefresh,
 	useExternalData = false
 }: RecentSubmissionsProps) {
-	const liveSubmissions = useLiveSubmissions();
 	const { config } = useConfig();
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [currentPage, setCurrentPage] = useState(1);
 	const itemsPerPage = 8;
+
+	// Only enable live submissions hook when not using external data
+	const liveSubmissions = useLiveSubmissions(!useExternalData);
 
 	const submissions = useExternalData ? externalSubmissions || [] : liveSubmissions.submissions;
 	const isLoading = useExternalData ? externalIsLoading || false : liveSubmissions.isLoading;
@@ -75,32 +78,19 @@ export function RecentSubmissions({
 		setTimeout(() => setIsRefreshing(false), 1000);
 	};
 
-	const getCategoryColor = (category: string) => {
-		const colors = {
-			'Home Task': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-			'Lab Task': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-			'Crypto': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-			'Web': 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
-			'Reversing': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-			'Forensics': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-			'OSINT': 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
-			'Misc': 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200',
-		};
-		return colors[category as keyof typeof colors] || colors['Misc'];
-	};
 
 	if (isLoading) {
 		return (
 			<Card className="h-full flex flex-col">
-				<CardHeader className="pb-2 px-4 py-2">
+				<CardHeader className="pb-2 px-4 lg:px-6 2xl:px-8 py-2 lg:py-3 2xl:py-4">
 					<div className="flex justify-between items-center">
 						<div>
-							<CardTitle className="flex items-center gap-1 text-base">
-								<Clock className="h-4 w-4" />
+							<CardTitle className="flex items-center gap-1 lg:gap-2 text-sm sm:text-base lg:text-lg 2xl:text-xl">
+								<Clock className="h-4 w-4 lg:h-5 lg:w-5 2xl:h-6 2xl:w-6" />
 								Recent Submissions
 							</CardTitle>
-							<CardDescription className="flex items-center gap-1 text-xs">
-								<Wifi className="h-3 w-3 text-green-500 animate-pulse" /> 
+							<CardDescription className="flex items-center gap-1 lg:gap-2 text-xs lg:text-sm 2xl:text-base">
+								<Wifi className="h-3 w-3 lg:h-4 lg:w-4 text-green-500 animate-pulse" /> 
 								Live updates every {Math.round(config.refetchInterval/1000)}s
 							</CardDescription>
 						</div>
@@ -109,14 +99,14 @@ export function RecentSubmissions({
 							size="sm" 
 							onClick={handleRefresh}
 							disabled={true}
-							className="h-8 w-8 p-0"
+							className="h-8 w-8 lg:h-10 lg:w-10 2xl:h-12 2xl:w-12 p-0"
 						>
-							<RefreshCw className="h-4 w-4" />
+							<RefreshCw className="h-4 w-4 lg:h-5 lg:w-5 2xl:h-6 2xl:w-6" />
 							<span className="sr-only">Refresh</span>
 						</Button>
 					</div>
 				</CardHeader>
-				<CardContent className="flex-1 p-0 sm:px-6 ">
+				<CardContent className="flex-1 p-0 sm:px-4 lg:px-6 2xl:px-8">
 					<SubmissionsSkeleton />
 				</CardContent>
 			</Card>
@@ -162,17 +152,17 @@ export function RecentSubmissions({
 	}
 
 	return (
-		<Card className="h-full flex flex-col">
-			<CardHeader className="pb-2 px-4 py-2">
-				<div className="flex justify-between items-center">
-					<div>
-						<CardTitle className="flex items-center gap-2 text-base">
-							<Clock className="h-4 w-4" />
-							Recent Submissions
+		<Card className="h-full flex flex-col min-h-0">
+			<CardHeader className="pb-1 sm:pb-1.5 px-1.5 sm:px-2 md:px-3 py-1 sm:py-1.5 flex-shrink-0">
+				<div className="flex justify-between items-center gap-2">
+					<div className="min-w-0 flex-1">
+						<CardTitle className="flex items-center gap-0.5 sm:gap-1 text-xs sm:text-sm md:text-base">
+							<Clock className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 lg:h-4 lg:w-4 flex-shrink-0" />
+							<span className="truncate">Recent Submissions</span>
 						</CardTitle>
-						<CardDescription className="flex items-center gap-1 text-xs">
-							<Wifi className="h-3 w-3 text-green-500 animate-pulse" /> 
-							Live updates every {Math.round(config.refetchInterval/1000)}s
+						<CardDescription className="flex items-center gap-0.5 sm:gap-1 text-[9px] sm:text-[10px] md:text-xs">
+							<Wifi className="h-2 w-2 sm:h-2.5 sm:w-2.5 md:h-3 md:w-3 text-green-500 animate-pulse flex-shrink-0" /> 
+							<span className="truncate">Live updates every {Math.round(config.refetchInterval/1000)}s</span>
 						</CardDescription>
 					</div>
 					<Button 
@@ -180,43 +170,43 @@ export function RecentSubmissions({
 						size="sm" 
 						onClick={handleRefresh}
 						disabled={isLoading || isRefreshing}
-						className="h-7 w-7 p-0"
+						className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 p-0 flex-shrink-0"
 					>
-						<RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+						<RefreshCw className={`h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
 						<span className="sr-only">Refresh</span>
 					</Button>
 				</div>
 			</CardHeader>
-			<CardContent className="flex-1 flex flex-col p-0 px-4 overflow-hidden">
+			<CardContent className="flex-1 flex flex-col p-0 px-1.5 sm:px-2 md:px-3 overflow-hidden min-h-0">
 				{filteredSubmissions.length > 0 ? (
 					<>
-						<div className="space-y-1.5 flex-1 overflow-y-auto">
+						<div className="space-y-0.5 sm:space-y-1 flex-1 overflow-y-auto min-h-0">
 							{paginatedSubmissions.map((submission) => (
 								<div
 									key={submission.id}
-									className="flex items-center justify-between p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors text-xs"
+									className="flex items-center justify-between p-1 sm:p-1.5 md:p-2 rounded-lg border bg-card hover:bg-accent/50 transition-colors text-[10px] sm:text-xs md:text-sm"
 								>
-									<div className="flex items-center gap-2 min-w-0 flex-1">
+									<div className="flex items-center gap-0.5 sm:gap-1 md:gap-1.5 min-w-0 flex-1">
 										<div className="flex-shrink-0">
-											<CheckCircle className="h-3 w-3 text-green-500" />
+											<CheckCircle className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 text-green-500" />
 										</div>
-										<div className="flex items-center gap-1 min-w-0">
-											<User className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-											<span className="font-medium truncate text-xs">{submission.user.name}</span>
+										<div className="flex items-center gap-0.5 sm:gap-0.5 md:gap-1 min-w-0">
+											<User className="h-2 w-2 sm:h-2.5 sm:w-2.5 md:h-3 md:w-3 text-muted-foreground flex-shrink-0" />
+											<span className="font-medium truncate text-[10px] sm:text-xs md:text-sm">{submission.user.name}</span>
 										</div>
-										<div className="flex items-center gap-1 min-w-0">
-											<Flag className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-											<span className="truncate text-xs">{submission.challenge.name}</span>
+										<div className="flex items-center gap-0.5 sm:gap-0.5 md:gap-1 min-w-0 hidden sm:flex">
+											<Flag className="h-2 w-2 sm:h-2.5 sm:w-2.5 md:h-3 md:w-3 text-muted-foreground flex-shrink-0" />
+											<span className="truncate text-[10px] sm:text-xs md:text-sm">{submission.challenge.name}</span>
 										</div>
-										<Badge className={`${getCategoryColor(submission.challenge.category)} text-[10px] px-1.5 py-0 flex-shrink-0 hidden sm:inline-flex`}>
+										<Badge className={`${getCategoryColor(submission.challenge.category)} text-[9px] sm:text-[10px] md:text-xs px-1 sm:px-1.5 py-0.5 flex-shrink-0 hidden md:inline-flex`}>
 											{submission.challenge.category}
 										</Badge>
 									</div>
-									<div className="flex items-center gap-2 flex-shrink-0">
-										<span className="font-mono text-xs font-semibold text-green-600">
+									<div className="flex items-center gap-0.5 sm:gap-1 md:gap-1.5 flex-shrink-0">
+										<span className="font-mono text-[10px] sm:text-xs md:text-sm font-semibold text-green-600">
 											+{submission.challenge.value}
 										</span>
-										<span className="text-[10px] text-muted-foreground hidden sm:inline" title={new Date(submission.date).toLocaleString()}>
+										<span className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground hidden sm:inline" title={new Date(submission.date).toLocaleString()}>
 											{formatTimeAgo(submission.date)}
 										</span>
 									</div>
@@ -226,21 +216,21 @@ export function RecentSubmissions({
 						
 						{/* Pagination */}
 						{totalPages > 1 && (
-							<div className="flex items-center justify-between py-2 pb-[0.8rem] border-t mt-auto flex-shrink-0">
-								<div className="text-xs text-muted-foreground">
+							<div className="flex items-center justify-between pt-1 pb-0 border-t mt-auto flex-shrink-0 gap-1 sm:gap-1.5">
+								<div className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground truncate">
 									{startIndex + 1}-{Math.min(endIndex, filteredSubmissions.length)} of {filteredSubmissions.length}
 								</div>
-								<div className="flex items-center gap-1">
+								<div className="flex items-center gap-0.5">
 									<Button
 										variant="outline"
 										size="sm"
 										onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
 										disabled={currentPage === 1}
-										className="h-7 w-7 p-0"
+										className="h-5 w-5 sm:h-6 sm:w-6 p-0"
 									>
-										<ChevronLeft className="h-3 w-3" />
+										<ChevronLeft className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
 									</Button>
-									<div className="text-xs">
+									<div className="text-[9px] sm:text-[10px] md:text-xs">
 										{currentPage} / {totalPages}
 									</div>
 									<Button
@@ -248,9 +238,9 @@ export function RecentSubmissions({
 										size="sm"
 										onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
 										disabled={currentPage === totalPages}
-										className="h-7 w-7 p-0"
+										className="h-5 w-5 sm:h-6 sm:w-6 p-0"
 									>
-										<ChevronRight className="h-3 w-3" />
+										<ChevronRight className="h-2.5 w-2.5 sm:h-3 sm:w-3" />
 									</Button>
 								</div>
 							</div>
@@ -274,18 +264,18 @@ export function RecentSubmissions({
 
 function SubmissionsSkeleton() {
 	return (
-		<div className="space-y-1.5">
-			{[...Array(10)].map((_, i) => (
-				<div key={i} className="flex items-center justify-between p-2 rounded-lg border">
-					<div className="flex items-center gap-2 flex-1">
-						<Skeleton className="h-3 w-3 rounded-full" />
-						<Skeleton className="h-3 w-16" />
-						<Skeleton className="h-3 w-24" />
-						<Skeleton className="h-4 w-12 rounded-full hidden sm:block" />
+		<div className="space-y-0.5 sm:space-y-1">
+			{[...Array(8)].map((_, i) => (
+				<div key={i} className="flex items-center justify-between p-1 sm:p-1.5 md:p-2 rounded-lg border">
+					<div className="flex items-center gap-0.5 sm:gap-1 flex-1">
+						<Skeleton className="h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full" />
+						<Skeleton className="h-2.5 sm:h-3 w-12 sm:w-16" />
+						<Skeleton className="h-2.5 sm:h-3 w-16 sm:w-24 hidden sm:block" />
+						<Skeleton className="h-3 w-10 rounded-full hidden md:block" />
 					</div>
-					<div className="flex items-center gap-2">
-						<Skeleton className="h-3 w-8" />
-						<Skeleton className="h-3 w-10 hidden sm:block" />
+					<div className="flex items-center gap-0.5 sm:gap-1">
+						<Skeleton className="h-2.5 sm:h-3 w-6 sm:w-8" />
+						<Skeleton className="h-2.5 sm:h-3 w-8 sm:w-10 hidden sm:block" />
 					</div>
 				</div>
 			))}

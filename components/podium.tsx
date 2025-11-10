@@ -1,9 +1,9 @@
 'use client';
 
 import { Card, CardContent } from "@/components/ui/card";
-import { Trophy, Medal, Target, Crown } from "lucide-react";
+import { Medal, Target, Crown } from "lucide-react";
 import { Skeleton } from '@/components/ui/skeleton';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 
 interface PodiumEntry {
@@ -273,11 +273,13 @@ export const Podium = ({ topThree, isLoading }: PodiumProps) => {
   const [previousScores, setPreviousScores] = useState<Record<number, number>>({});
 
   useEffect(() => {
-    const newScores: Record<number, number> = {};
-    topThree.forEach(entry => {
-      newScores[entry.rank] = previousScores[entry.rank] ?? entry.score;
+    setPreviousScores((prev) => {
+      const newScores: Record<number, number> = {};
+      topThree.forEach(entry => {
+        newScores[entry.rank] = prev[entry.rank] ?? entry.score;
+      });
+      return newScores;
     });
-    setPreviousScores(newScores);
   }, [topThree]);
 
   if (isLoading) {

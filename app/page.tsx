@@ -16,11 +16,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Trophy, Flag, Users, Clock, Target, TrendingUp, Settings, Droplets, CheckCircle } from "lucide-react";
+import { Trophy, Flag, Users, Settings, Droplets, CheckCircle } from "lucide-react";
 import { ConfigDialog } from '@/components/config-dialog';
 import { DynamicTitle } from '@/components/dynamic-title';
-import { ChallengeCard } from '@/components/page/challenge-card';
 import { ChallengeDetailView } from '@/components/page/challenge-detail-view';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { RecentSubmissions } from '@/components/scoreboard-chart';
@@ -79,7 +77,6 @@ export default function CTFScoreboard() {
   const [firstBloodUsers, setFirstBloodUsers] = useState<Map<number, {id: number, name: string}>>(new Map());
   const [currentTab, setCurrentTab] = useState("scoreboard");
   const [showAuthWarning, setShowAuthWarning] = useState(false);
-  const [showConfigDialog, setShowConfigDialog] = useState(false);
   const [selectedChallengeId, setSelectedChallengeId] = useState<number | null>(null);
   const [refreshCountdown, setRefreshCountdown] = useState(0);
   const [dynamicItemsPerPage, setDynamicItemsPerPage] = useState(10);
@@ -92,7 +89,6 @@ export default function CTFScoreboard() {
     statLabel: 'text-[10px]',
     badge: 'text-[10px]'
   });
-  const tabs = ["scoreboard", "challenges", "analytics"];
 
   // Detect authentication errors
   useEffect(() => {
@@ -107,6 +103,7 @@ export default function CTFScoreboard() {
   useEffect(() => {
     if (!config.autoRotate || !isConfigured) return;
     
+    const tabs = ["scoreboard", "challenges", "analytics"];
     const rotationInterval = setInterval(() => {
       setCurrentTab((prevTab) => {
         const currentIndex = tabs.indexOf(prevTab);

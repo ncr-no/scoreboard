@@ -7,6 +7,7 @@ interface ConfigState {
   apiToken: string;
   refetchInterval: number; // in milliseconds
   topTeamsCount: number; // number of top teams to fetch (minimum 10)
+  autoRotate: boolean; // auto-rotate tabs
 }
 
 interface ConfigContextType {
@@ -25,6 +26,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
     apiToken: '',
     refetchInterval: 60000, // Default to 60 seconds
     topTeamsCount: 10, // Default to 10 teams
+    autoRotate: false, // Default to false
   });
 
   const [isConfigured, setIsConfigured] = useState(false);
@@ -41,6 +43,7 @@ export function ConfigProvider({ children }: { children: React.ReactNode }) {
           apiToken: parsed.apiToken || '',
           refetchInterval: parsed.refetchInterval || 30000,
           topTeamsCount: parsed.topTeamsCount || 10,
+          autoRotate: parsed.autoRotate ?? false,
         };
         setConfigState(configWithDefaults);
         setIsConfigured(!!configWithDefaults.apiUrl && !!configWithDefaults.apiToken);

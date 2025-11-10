@@ -9,14 +9,19 @@ export function useSubmissions(params?: {
   page?: number;
   challenge_id?: number;
   user_id?: number;
+  enabled?: boolean;
 }) {
   const { config, isConfigured } = useConfig();
+  const enabled = params?.enabled !== undefined ? params.enabled && isConfigured : isConfigured;
+  
+  // Exclude 'enabled' from params for query key and API call
+  const { enabled: _, ...apiParams } = params || {};
 
   return useQuery<SubmissionsResponse>({
-    queryKey: ['submissions', params, config.apiUrl, config.apiToken],
-    queryFn: () => getSubmissions(config, params),
-    enabled: isConfigured,
-    refetchInterval: config.refetchInterval > 10000 ? config.refetchInterval : 15000, // Default to 15s if not set
+    queryKey: ['submissions', apiParams, config.apiUrl, config.apiToken],
+    queryFn: () => getSubmissions(config, apiParams),
+    enabled,
+    refetchInterval: enabled && config.refetchInterval > 10000 ? config.refetchInterval : 15000, // Default to 15s if not set
     staleTime: Math.max(config.refetchInterval || 15000, 10000), // Cache for at least 10s
   });
 }

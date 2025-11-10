@@ -186,6 +186,13 @@ export function RecentSubmissions({
         {submissions.length > 0 ? (
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {[...submissions]
+              // Filter out invalid submissions with null/missing challenge data
+              .filter((submission) => 
+                submission.challenge && 
+                submission.challenge.id && 
+                submission.challenge.name &&
+                submission.challenge.name !== 'challenge_null'
+              )
               // Sort submissions by date (most recent first)
               .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
               .map((submission) => (

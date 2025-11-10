@@ -16,6 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from '@/components/ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trophy, Flag, Users, Clock, Target, TrendingUp, Settings, Droplets } from "lucide-react";
 import { ConfigDialog } from '@/components/config-dialog';
 import { DynamicTitle } from '@/components/dynamic-title';
@@ -57,8 +58,26 @@ export default function CTFScoreboard() {
   const [challengesPage, setChallengesPage] = useState(1);
   const [firstBloods, setFirstBloods] = useState<Map<number, number>>(new Map());
   const [firstBloodUsers, setFirstBloodUsers] = useState<Map<number, {id: number, name: string}>>(new Map());
-  const itemsPerPage = 10;
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [currentTab, setCurrentTab] = useState("scoreboard");
+  const [autoRotate, setAutoRotate] = useState(false);
   const challengesPerPage = 9;
+  const tabs = ["scoreboard", "submissions", "challenges", "analytics"];
+
+  // Auto-rotate tabs
+  useEffect(() => {
+    if (!autoRotate || !isConfigured) return;
+    
+    const rotationInterval = setInterval(() => {
+      setCurrentTab((prevTab) => {
+        const currentIndex = tabs.indexOf(prevTab);
+        const nextIndex = (currentIndex + 1) % tabs.length;
+        return tabs[nextIndex];
+      });
+    }, 10000); // Rotate every 10 seconds
+
+    return () => clearInterval(rotationInterval);
+  }, [autoRotate, isConfigured]);
 
   useEffect(() => {
     if (!challenges || !Array.isArray(challenges)) return;
@@ -104,7 +123,17 @@ export default function CTFScoreboard() {
   const allusers = scoreboardResponse?.data ? Object.entries(scoreboardResponse.data).map(([pos, entry]: [string, ScoreboardEntry]) => {
     const solves = Array.isArray(entry.solves) ? entry.solves : [];
     
-    const userFirstBloods = solves.filter((solve: ScoreboardEntry['solves'][0]) => {
+    // Filter out invalid solves - only keep solves for challenges that exist in the challenges list
+    const validSolves = solves.filter((solve: ScoreboardEntry['solves'][0]) => {
+      // If we have the challenges list, verify the challenge exists
+      if (challenges && Array.isArray(challenges)) {
+        return challenges.some((c: Challenge) => c.id === solve.challenge_id);
+      }
+      // If we don't have challenges list yet, keep all solves (they'll be validated later)
+      return true;
+    });
+    
+    const userFirstBloods = validSolves.filter((solve: ScoreboardEntry['solves'][0]) => {
       return firstBloods.get(solve.challenge_id) === entry.id;
     }).length;
     
@@ -112,11 +141,11 @@ export default function CTFScoreboard() {
       rank: parseInt(pos),
       name: entry.name,
       score: entry.score,
-      solves: solves,
-      solvedChallenges: solves.length,
+      solves: validSolves,
+      solvedChallenges: validSolves.length,
       firstBloods: userFirstBloods,
       account_id: entry.id,
-      last_solve: solves.length > 0 ? solves.sort((a: ScoreboardEntry['solves'][0], b: ScoreboardEntry['solves'][0]) => 
+      last_solve: validSolves.length > 0 ? validSolves.sort((a: ScoreboardEntry['solves'][0], b: ScoreboardEntry['solves'][0]) => 
         new Date(b.date).getTime() - new Date(a.date).getTime()
       )[0].date : null
     };
@@ -154,14 +183,23 @@ export default function CTFScoreboard() {
   };
 
   const processedScoreboard = fullScoreboard ? fullScoreboard.map((entry: ScoreboardEntry) => {
-    const userFirstBloods = Array.isArray(entry.solves) ? entry.solves.filter((solve: ScoreboardEntry['solves'][0]) => {
+    // Filter out invalid solves - only keep solves for challenges that exist in the challenges list
+    const validSolves = Array.isArray(entry.solves) ? entry.solves.filter((solve: ScoreboardEntry['solves'][0]) => {
+      if (challenges && Array.isArray(challenges)) {
+        return challenges.some((c: Challenge) => c.id === solve.challenge_id);
+      }
+      return true;
+    }) : [];
+    
+    const userFirstBloods = validSolves.filter((solve: ScoreboardEntry['solves'][0]) => {
       return firstBloods.get(solve.challenge_id) === entry.id;
-    }).length : 0;
+    }).length;
     
     return {
       ...entry,
+      solves: validSolves,
       firstBloods: userFirstBloods,
-      solvedChallenges: Array.isArray(entry.solves) ? entry.solves.length : 0
+      solvedChallenges: validSolves.length
     };
   }) : [];
   
@@ -197,15 +235,17 @@ export default function CTFScoreboard() {
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
+    <div className="min-h-screen overflow-x-hidden bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900">
       <DynamicTitle />
-      <div className="container mx-auto py-8 px-4 h-full flex flex-col">
-        <div className="text-center mb-8 relative">
-          <div className="absolute top-0 right-0 flex items-center gap-2">
+      <div className="container mx-auto py-4 sm:py-8 px-2 sm:px-4">
+        <div className="text-center mb-4 sm:mb-8 relative">
+          <div className="absolute top-0 right-0 flex items-center gap-1 sm:gap-2 flex-wrap justify-end">
             {isConfigured && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                Auto-refresh: {config.refetchInterval / 1000}s
+              <div className="flex items-center gap-1 text-[10px] sm:text-xs text-muted-foreground bg-muted px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
+                <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <span className="hidden sm:inline">Auto-refresh:</span>
+                <span className="sm:hidden">Refresh:</span>
+                {config.refetchInterval / 1000}s
               </div>
             )}
             {process.env.NEXT_PUBLIC_SHOW_DEVTOOLS === 'true' && (
@@ -213,9 +253,10 @@ export default function CTFScoreboard() {
             )}
             <ConfigDialog />
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2 flex items-center justify-center gap-3">
+          {/* Add right padding on mobile to prevent title from overlapping with settings button, remove on larger screens where there's more space */}
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-2 flex items-center justify-center gap-2 sm:gap-3 pr-20 sm:pr-0">
             {ctfNameLoading ? (
-              <Skeleton className="h-10 w-64" />
+              <Skeleton className="h-8 sm:h-10 w-48 sm:w-64" />
             ) : (
               ctfName || 'CTF Scoreboard'
             )}
@@ -237,113 +278,131 @@ export default function CTFScoreboard() {
           </Card>
         ) : (
           <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-4 mb-4 sm:mb-8">
               <Card>
-                <CardContent className="p-4 text-center">
-                  <div className="flex items-center justify-center mb-2">
-                    <Users className="h-5 w-5 text-blue-500" />
+                <CardContent className="p-2 sm:p-4 text-center">
+                  <div className="flex items-center justify-center mb-1 sm:mb-2">
+                    <Users className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500" />
                   </div>
-                  <div className="text-2xl font-bold">{stats.totalusers}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Users</div>
+                  <div className="text-lg sm:text-2xl font-bold">{stats.totalusers}</div>
+                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Users</div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="p-4 text-center">
-                  <div className="flex items-center justify-center mb-2">
-                    <Flag className="h-5 w-5 text-green-500" />
+                <CardContent className="p-2 sm:p-4 text-center">
+                  <div className="flex items-center justify-center mb-1 sm:mb-2">
+                    <Flag className="h-4 w-4 sm:h-5 sm:w-5 text-green-500" />
                   </div>
-                  <div className="text-2xl font-bold">{stats.totalChallenges}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Challenges</div>
+                  <div className="text-lg sm:text-2xl font-bold">{stats.totalChallenges}</div>
+                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Challenges</div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="p-4 text-center">
-                  <div className="flex items-center justify-center mb-2">
-                    <Target className="h-5 w-5 text-purple-500" />
+                <CardContent className="p-2 sm:p-4 text-center">
+                  <div className="flex items-center justify-center mb-1 sm:mb-2">
+                    <Target className="h-4 w-4 sm:h-5 sm:w-5 text-purple-500" />
                   </div>
-                  <div className="text-2xl font-bold">{stats.totalSubmissions}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Submissions</div>
+                  <div className="text-lg sm:text-2xl font-bold">{stats.totalSubmissions}</div>
+                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Submissions</div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="p-4 text-center">
-                  <div className="flex items-center justify-center mb-2">
-                    <TrendingUp className="h-5 w-5 text-orange-500" />
+                <CardContent className="p-2 sm:p-4 text-center">
+                  <div className="flex items-center justify-center mb-1 sm:mb-2">
+                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-orange-500" />
                   </div>
-                  <div className="text-2xl font-bold">{stats.averageScore}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Avg Score</div>
+                  <div className="text-lg sm:text-2xl font-bold">{stats.averageScore}</div>
+                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Avg Score</div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="p-4 text-center">
-                  <div className="flex items-center justify-center mb-2">
-                    <Trophy className="h-5 w-5 text-yellow-500" />
+                <CardContent className="p-2 sm:p-4 text-center">
+                  <div className="flex items-center justify-center mb-1 sm:mb-2">
+                    <Trophy className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500" />
                   </div>
-                  <div className="text-2xl font-bold">{stats.topScore}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Top Score</div>
+                  <div className="text-lg sm:text-2xl font-bold">{stats.topScore}</div>
+                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Top Score</div>
                 </CardContent>
               </Card>
               <Card>
-                <CardContent className="p-4 text-center">
-                  <div className="flex items-center justify-center mb-2">
-                    <Clock className="h-5 w-5 text-red-500" />
+                <CardContent className="p-2 sm:p-4 text-center">
+                  <div className="flex items-center justify-center mb-1 sm:mb-2">
+                    <Clock className="h-4 w-4 sm:h-5 sm:w-5 text-red-500" />
                   </div>
-                  <div className="text-2xl font-bold">{stats.timeLeft}</div>
-                  <div className="text-sm text-gray-600 dark:text-gray-400">Time Left</div>
+                  <div className="text-lg sm:text-2xl font-bold">{stats.timeLeft}</div>
+                  <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Time Left</div>
                 </CardContent>
               </Card>
             </div>
 
-            <Tabs defaultValue="scoreboard" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="scoreboard">Scoreboard</TabsTrigger>
-                <TabsTrigger value="submissions">Live Submissions</TabsTrigger>
-                <TabsTrigger value="challenges">Challenges</TabsTrigger>
-                <TabsTrigger value="analytics">Analytics</TabsTrigger>
-              </TabsList>
+            <Tabs value={currentTab} onValueChange={setCurrentTab} className="space-y-4">
+              <div className="flex items-center justify-between gap-2 mb-2">
+                <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1">
+                  <TabsTrigger value="scoreboard" className="text-xs sm:text-sm">Scoreboard</TabsTrigger>
+                  <TabsTrigger value="submissions" className="text-xs sm:text-sm">Submissions</TabsTrigger>
+                  <TabsTrigger value="challenges" className="text-xs sm:text-sm">Challenges</TabsTrigger>
+                  <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
+                </TabsList>
+                <button
+                  onClick={() => setAutoRotate(!autoRotate)}
+                  className={`flex items-center gap-1 px-2 sm:px-3 py-1 sm:py-2 text-xs rounded-md transition-colors whitespace-nowrap ${
+                    autoRotate 
+                      ? 'bg-green-500 text-white hover:bg-green-600' 
+                      : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                  }`}
+                  title={autoRotate ? "Auto-rotation enabled (10s)" : "Enable auto-rotation"}
+                >
+                  <span className="hidden sm:inline">{autoRotate ? '🔄 Auto' : '▶️ Auto'}</span>
+                  <span className="sm:hidden">{autoRotate ? '🔄' : '▶️'}</span>
+                </button>
+              </div>
 
               <TabsContent value="scoreboard" className="space-y-4">
                 <Card>
-                  <CardContent>
+                  <CardContent className="p-0 sm:p-6">
                     {isLoading ? (
-                      <ScoreboardSkeleton />
+                      <div className="p-4">
+                        <ScoreboardSkeleton />
+                      </div>
                     ) : isError ? (
-                      <div className="text-center text-red-500 py-8">
-                        <p className="text-lg font-semibold mb-2">Failed to load scoreboard</p>
-                        <p className="text-sm">{error?.message}</p>
+                      <div className="text-center text-red-500 py-8 px-4">
+                        <p className="text-base sm:text-lg font-semibold mb-2">Failed to load scoreboard</p>
+                        <p className="text-xs sm:text-sm">{error?.message}</p>
                       </div>
                     ) : (
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead className="w-16">Rank</TableHead>
-                            <TableHead>User</TableHead>
-                            <TableHead className="text-right">Score</TableHead>
-                            <TableHead className="text-center min-w-[200px]">
-                              <div className="flex items-center justify-center gap-1" title="Challenges solved">
-                                <div title="Challenges solved">
-                                  <Flag className="h-4 w-4" />
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-12 sm:w-16">Rank</TableHead>
+                              <TableHead>User</TableHead>
+                              <TableHead className="text-right">Score</TableHead>
+                              <TableHead className="text-center min-w-[120px] sm:min-w-[200px]">
+                                <div className="flex items-center justify-center gap-1" title="Challenges solved">
+                                  <div title="Challenges solved">
+                                    <Flag className="h-3 w-3 sm:h-4 sm:w-4" />
+                                  </div>
+                                  <span className="hidden sm:inline">Challenges</span>
+                                  <span className="sm:hidden text-xs">Solved</span>
                                 </div>
-                                <span>Challenges</span>
-                              </div>
-                            </TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
                           {users.length > 0 ? users.map((user) => (
                             <TableRow key={user.account_id} className={user.rank <= 3 ? "bg-yellow-50 dark:bg-yellow-950/20" : ""}>
                               <TableCell className="font-medium">
-                                <div className="flex items-center gap-2">
-                                  {user.rank === 1 && <Trophy className="h-4 w-4 text-yellow-500" />}
-                                  {user.rank === 2 && <Trophy className="h-4 w-4 text-gray-400" />}
-                                  {user.rank === 3 && <Trophy className="h-4 w-4 text-amber-600" />}
+                                <div className="flex items-center gap-1 sm:gap-2">
+                                  {user.rank === 1 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500" />}
+                                  {user.rank === 2 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />}
+                                  {user.rank === 3 && <Trophy className="h-3 w-3 sm:h-4 sm:w-4 text-amber-600" />}
                                   {user.rank > 3 && `#${user.rank}`}
                                 </div>
                               </TableCell>
-                              <TableCell className="font-semibold">{user.name}</TableCell>
-                              <TableCell className="text-right font-mono text-lg">{user.score.toLocaleString()}</TableCell>
+                              <TableCell className="font-semibold text-xs sm:text-sm">{user.name}</TableCell>
+                              <TableCell className="text-right font-mono text-sm sm:text-lg">{user.score.toLocaleString()}</TableCell>
                               <TableCell className="text-center">
-                                <div className="flex flex-wrap gap-1 justify-center items-center min-h-[32px] max-w-lg mx-auto py-2" title={`${user.solvedChallenges} challenges solved`}>
+                                <div className="flex flex-wrap gap-0.5 sm:gap-1 justify-center items-center min-h-[24px] sm:min-h-[32px] max-w-lg mx-auto py-1 sm:py-2" title={`${user.solvedChallenges} challenges solved`}>
                                   {user.solves && Array.isArray(user.solves) ? (
                                     user.solves.map((solve: ScoreboardEntry['solves'][0]) => {
                                       const challenge = challenges?.find((c: Challenge) => c.id === solve.challenge_id);
@@ -354,16 +413,16 @@ export default function CTFScoreboard() {
                                         <div
                                           key={solve.challenge_id}
                                           title={`${challengeName}${isFirstBlood ? ' (First Blood!)' : ''} - Solved on ${new Date(solve.date).toLocaleString()}`}
-                                          className={`cursor-help flex items-center justify-center p-1 rounded transition-colors ${
+                                          className={`cursor-help flex items-center justify-center p-0.5 sm:p-1 rounded transition-colors ${
                                             isFirstBlood 
                                               ? 'hover:bg-red-100 dark:hover:bg-red-900/20' 
                                               : 'hover:bg-green-100 dark:hover:bg-green-900/20'
                                           }`}
                                         >
                                           {isFirstBlood ? (
-                                            <Droplets className="h-4 w-4 text-red-500" />
+                                            <Droplets className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
                                           ) : (
-                                            <Flag className="h-4 w-4 text-green-500" />
+                                            <Flag className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
                                           )}
                                         </div>
                                       );
@@ -373,13 +432,13 @@ export default function CTFScoreboard() {
                                       <div
                                         key={i}
                                         title="Challenge solved"
-                                        className="cursor-help flex items-center justify-center p-1 hover:bg-green-100 dark:hover:bg-green-900/20 rounded transition-colors"
+                                        className="cursor-help flex items-center justify-center p-0.5 sm:p-1 hover:bg-green-100 dark:hover:bg-green-900/20 rounded transition-colors"
                                       >
-                                        <Flag className="h-4 w-4 text-green-500" />
+                                        <Flag className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
                                       </div>
                                     ))
                                   ) : (
-                                    <span className="text-muted-foreground text-sm">No solves</span>
+                                    <span className="text-muted-foreground text-xs sm:text-sm">No solves</span>
                                   )}
                                 </div>
                               </TableCell>
@@ -393,72 +452,98 @@ export default function CTFScoreboard() {
                           )}
                         </TableBody>
                       </Table>
+                      </div>
                     )}
                     
-                    {allusers.length > itemsPerPage && (
-                      <div className="flex items-center justify-between mt-6">
-                        <div className="text-sm text-muted-foreground">
-                          Showing {startIndex + 1} to {Math.min(endIndex, allusers.length)} of {allusers.length} users
+                    {allusers.length > 0 && (
+                      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 mt-4 sm:mt-6 px-4 sm:px-0">
+                        <div className="flex items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                          <span>
+                            Showing {startIndex + 1} to {Math.min(endIndex, allusers.length)} of {allusers.length} users
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="whitespace-nowrap">Per page:</span>
+                            <Select 
+                              value={itemsPerPage.toString()} 
+                              onValueChange={(value) => {
+                                setItemsPerPage(parseInt(value));
+                                setCurrentPage(1); // Reset to first page when changing items per page
+                              }}
+                            >
+                              <SelectTrigger className="w-16 h-8 text-xs">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="5">5</SelectItem>
+                                <SelectItem value="10">10</SelectItem>
+                                <SelectItem value="20">20</SelectItem>
+                                <SelectItem value="50">50</SelectItem>
+                                <SelectItem value="100">100</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
-                        <Pagination>
-                          <PaginationContent>
-                            <PaginationItem>
-                              <PaginationPrevious 
-                                href="#"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  if (currentPage > 1) handlePageChange(currentPage - 1);
-                                }}
-                                className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
-                              />
-                            </PaginationItem>
-                            
-                            {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                              let pageNum;
-                              if (totalPages <= 5) {
-                                pageNum = i + 1;
-                              } else if (currentPage <= 3) {
-                                pageNum = i + 1;
-                              } else if (currentPage >= totalPages - 2) {
-                                pageNum = totalPages - 4 + i;
-                              } else {
-                                pageNum = currentPage - 2 + i;
-                              }
-                              
-                              return (
-                                <PaginationItem key={pageNum}>
-                                  <PaginationLink
-                                    href="#"
-                                    onClick={(e) => {
-                                      e.preventDefault();
-                                      handlePageChange(pageNum);
-                                    }}
-                                    isActive={currentPage === pageNum}
-                                  >
-                                    {pageNum}
-                                  </PaginationLink>
-                                </PaginationItem>
-                              );
-                            })}
-                            
-                            {totalPages > 5 && currentPage < totalPages - 2 && (
+                        {allusers.length > itemsPerPage && (
+                          <Pagination>
+                            <PaginationContent>
                               <PaginationItem>
-                                <PaginationEllipsis />
+                                <PaginationPrevious 
+                                  href="#"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    if (currentPage > 1) handlePageChange(currentPage - 1);
+                                  }}
+                                  className={currentPage === 1 ? "pointer-events-none opacity-50" : ""}
+                                />
                               </PaginationItem>
-                            )}
-                            
-                            <PaginationItem>
-                              <PaginationNext 
-                                href="#"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  if (currentPage < totalPages) handlePageChange(currentPage + 1);
-                                }}
-                                className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
-                              />
-                            </PaginationItem>
-                          </PaginationContent>
-                        </Pagination>
+                              
+                              {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                                let pageNum;
+                                if (totalPages <= 5) {
+                                  pageNum = i + 1;
+                                } else if (currentPage <= 3) {
+                                  pageNum = i + 1;
+                                } else if (currentPage >= totalPages - 2) {
+                                  pageNum = totalPages - 4 + i;
+                                } else {
+                                  pageNum = currentPage - 2 + i;
+                                }
+                                
+                                return (
+                                  <PaginationItem key={pageNum}>
+                                    <PaginationLink
+                                      href="#"
+                                      onClick={(e) => {
+                                        e.preventDefault();
+                                        handlePageChange(pageNum);
+                                      }}
+                                      isActive={currentPage === pageNum}
+                                    >
+                                      {pageNum}
+                                    </PaginationLink>
+                                  </PaginationItem>
+                                );
+                              })}
+                              
+                              {totalPages > 5 && currentPage < totalPages - 2 && (
+                                <PaginationItem>
+                                  <PaginationEllipsis />
+                                </PaginationItem>
+                              )}
+                              
+                              <PaginationItem>
+                                <PaginationNext 
+                                  href="#"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    if (currentPage < totalPages) handlePageChange(currentPage + 1);
+                                  }}
+                                  className={currentPage === totalPages ? "pointer-events-none opacity-50" : ""}
+                                />
+                              </PaginationItem>
+                            </PaginationContent>
+                          </Pagination>
+                        )}
                       </div>
                     )}
                   </CardContent>
@@ -471,26 +556,26 @@ export default function CTFScoreboard() {
 
               <TabsContent value="challenges" className="space-y-4">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Challenge Overview</CardTitle>
-                    <CardDescription>Available challenges and solve statistics</CardDescription>
+                  <CardHeader className="px-4 sm:px-6">
+                    <CardTitle className="text-lg sm:text-xl">Challenge Overview</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">Available challenges and solve statistics</CardDescription>
                   </CardHeader>
-                  <CardContent>
+                  <CardContent className="px-2 sm:px-6">
                     {challengesLoading ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4">
                         {[...Array(6)].map((_, i) => (
                           <Skeleton key={i} className="h-32 w-full" />
                         ))}
                       </div>
                     ) : challengesError ? (
-                      <div className="text-center text-red-500 py-8">
-                        <Flag className="h-12 w-12 mx-auto mb-4" />
-                        <p className="text-lg font-semibold mb-2">Failed to load challenges</p>
-                        <p className="text-sm">Please check your API configuration</p>
+                      <div className="text-center text-red-500 py-8 px-4">
+                        <Flag className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-4" />
+                        <p className="text-base sm:text-lg font-semibold mb-2">Failed to load challenges</p>
+                        <p className="text-xs sm:text-sm">Please check your API configuration</p>
                       </div>
                     ) : allChallenges.length > 0 ? (
                       <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
                           {paginatedChallenges.map((challenge) => {
                             const firstBloodInfo = firstBloodUsers.get(challenge.id);
                             
@@ -505,8 +590,8 @@ export default function CTFScoreboard() {
                         </div>
                         
                         {allChallenges.length > challengesPerPage && (
-                          <div className="flex items-center justify-between">
-                            <div className="text-sm text-muted-foreground">
+                          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-2 sm:px-0">
+                            <div className="text-xs sm:text-sm text-muted-foreground">
                               Showing {challengesStartIndex + 1} to {Math.min(challengesEndIndex, allChallenges.length)} of {allChallenges.length} challenges
                             </div>
                             <Pagination>
@@ -583,23 +668,23 @@ export default function CTFScoreboard() {
               </TabsContent>
 
               <TabsContent value="analytics" className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-4">
                   <Card>
-                    <CardHeader>
-                      <CardTitle>Top Performing Users</CardTitle>
-                      <CardDescription>Users with highest scores</CardDescription>
+                    <CardHeader className="px-4 sm:px-6">
+                      <CardTitle className="text-base sm:text-lg">Top Performing Users</CardTitle>
+                      <CardDescription className="text-xs sm:text-sm">Users with highest scores</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
+                    <CardContent className="px-4 sm:px-6">
+                      <div className="space-y-2 sm:space-y-3">
                         {allusers.slice(0, 5).map((user, idx) => (
-                          <div key={idx} className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                              <span className="font-medium">{user.name}</span>
+                          <div key={idx} className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-1">
+                              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                              <span className="font-medium text-xs sm:text-sm truncate">{user.name}</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-600">{user.score} points</span>
-                              <Badge variant="outline">#{user.rank}</Badge>
+                            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                              <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{user.score} pts</span>
+                              <Badge variant="outline" className="text-xs">#{user.rank}</Badge>
                             </div>
                           </div>
                         ))}
@@ -608,36 +693,36 @@ export default function CTFScoreboard() {
                   </Card>
 
                   <Card>
-                    <CardHeader>
-                      <CardTitle>Challenge Statistics</CardTitle>
-                      <CardDescription>Overview of challenges and solving progress</CardDescription>
+                    <CardHeader className="px-4 sm:px-6">
+                      <CardTitle className="text-base sm:text-lg">Challenge Statistics</CardTitle>
+                      <CardDescription className="text-xs sm:text-sm">Overview of challenges and solving progress</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-4 text-center">
+                    <CardContent className="px-4 sm:px-6">
+                      <div className="space-y-3 sm:space-y-4">
+                        <div className="grid grid-cols-2 gap-2 sm:gap-4 text-center">
                           <div>
-                            <div className="text-2xl font-bold text-blue-600">{stats.totalChallenges}</div>
-                            <div className="text-sm text-gray-600">Total Challenges</div>
+                            <div className="text-lg sm:text-2xl font-bold text-blue-600">{stats.totalChallenges}</div>
+                            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Total Challenges</div>
                           </div>
                           <div>
-                            <div className="text-2xl font-bold text-green-600">
+                            <div className="text-lg sm:text-2xl font-bold text-green-600">
                               {challenges ? Object.keys(challenges.reduce((acc, c) => ({ ...acc, [c.category]: true }), {})).length : 0}
                             </div>
-                            <div className="text-sm text-gray-600">Categories</div>
+                            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Categories</div>
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4 text-center">
+                        <div className="grid grid-cols-2 gap-2 sm:gap-4 text-center">
                           <div>
-                            <div className="text-2xl font-bold text-orange-600">
+                            <div className="text-lg sm:text-2xl font-bold text-orange-600">
                               {challenges ? Math.round(challenges.reduce((sum, c) => sum + c.solves, 0) / Math.max(challenges.length, 1)) : 0}
                             </div>
-                            <div className="text-sm text-gray-600">Avg Solves</div>
+                            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Avg Solves</div>
                           </div>
                           <div>
-                            <div className="text-2xl font-bold text-purple-600">
+                            <div className="text-lg sm:text-2xl font-bold text-purple-600">
                               {challenges ? Math.max(...challenges.map(c => c.solves), 0) : 0}
                             </div>
-                            <div className="text-sm text-gray-600">Most Solved</div>
+                            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Most Solved</div>
                           </div>
                         </div>
                       </div>
@@ -645,12 +730,12 @@ export default function CTFScoreboard() {
                   </Card>
 
                   <Card>
-                    <CardHeader>
-                      <CardTitle>Competition Statistics</CardTitle>
-                      <CardDescription>Overview of current competition state</CardDescription>
+                    <CardHeader className="px-4 sm:px-6">
+                      <CardTitle className="text-base sm:text-lg">Competition Statistics</CardTitle>
+                      <CardDescription className="text-xs sm:text-sm">Overview of current competition state</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
+                    <CardContent className="px-4 sm:px-6">
+                      <div className="space-y-3 sm:space-y-4">
                         <div className="grid grid-cols-2 gap-4 text-center">
                           <div>
                             <div className="text-2xl font-bold text-blue-600">{stats.totalusers}</div>
@@ -676,24 +761,24 @@ export default function CTFScoreboard() {
                   </Card>
 
                   <Card>
-                    <CardHeader>
-                      <CardTitle>Challenge Categories</CardTitle>
-                      <CardDescription>Distribution of challenges by category</CardDescription>
+                    <CardHeader className="px-4 sm:px-6">
+                      <CardTitle className="text-base sm:text-lg">Challenge Categories</CardTitle>
+                      <CardDescription className="text-xs sm:text-sm">Distribution of challenges by category</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                      <div className="space-y-3">
+                    <CardContent className="px-4 sm:px-6">
+                      <div className="space-y-2 sm:space-y-3">
                         {challenges && Object.entries(
                           challenges.reduce((acc, challenge) => {
                             acc[challenge.category] = (acc[challenge.category] || 0) + 1;
                             return acc;
                           }, {} as Record<string, number>)
                         ).map(([category, count]) => (
-                          <div key={category} className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                              <span className="font-medium">{category}</span>
+                          <div key={category} className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-1">
+                              <div className="w-1.5 h-1.5 sm:w-2 sm:h-2 bg-purple-500 rounded-full flex-shrink-0"></div>
+                              <span className="font-medium text-xs sm:text-sm truncate">{category}</span>
                             </div>
-                            <Badge variant="outline">{count} challenges</Badge>
+                            <Badge variant="outline" className="text-xs flex-shrink-0">{count} challenges</Badge>
                           </div>
                         ))}
                       </div>

@@ -1,9 +1,15 @@
 import { AppSounds } from '@/types/sounds';
 import { useEffect, useState } from 'react';
 
-const SUCCESS_SOUND = '/sounds/success.mp3';
-const ERROR_SOUND = '/sounds/error.mp3';
-const FIRST_BLOOD_SOUND = '/sounds/firstblood.mp3';
+// Use basePath-aware paths for GitHub Pages deployment
+const getAssetPath = (path: string) => {
+  const basePath = process.env.NODE_ENV === 'production' ? '/ctf-scoreboard' : '';
+  return `${basePath}${path}`;
+};
+
+const SUCCESS_SOUND = getAssetPath('/sounds/success.mp3');
+const ERROR_SOUND = getAssetPath('/sounds/error.mp3');
+const FIRST_BLOOD_SOUND = getAssetPath('/sounds/firstblood.mp3');
 
 export function useAppSounds(): AppSounds {
   const [isClient, setIsClient] = useState(false);

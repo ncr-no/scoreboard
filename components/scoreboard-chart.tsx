@@ -19,23 +19,16 @@ interface RecentSubmissionsProps {
 }
 
 export function RecentSubmissions({ 
-	submissions: externalSubmissions, 
-	isLoading: externalIsLoading, 
-	isError: externalIsError, 
-	error: externalError, 
-	onRefresh: externalOnRefresh,
-	useExternalData = false
-}: RecentSubmissionsProps) {
-	const liveSubmissions = useLiveSubmissions();
+	submissions = [],
+	isLoading = false,
+	isError = false,
+	error = null,
+	onRefresh,
+	}: RecentSubmissionsProps) {
 	const { config } = useConfig();
 	const [isRefreshing, setIsRefreshing] = useState(false);
 	const [currentPage, setCurrentPage] = useState(1);
 	const itemsPerPage = 10;
-	
-	const submissions = useExternalData ? externalSubmissions || [] : liveSubmissions.submissions;
-	const isLoading = useExternalData ? externalIsLoading || false : liveSubmissions.isLoading;
-	const isError = useExternalData ? externalIsError || false : liveSubmissions.isError;
-	const error = useExternalData ? externalError : liveSubmissions.error;
 
 	// Filter and sort submissions
 	const filteredSubmissions = [...submissions]
@@ -67,10 +60,8 @@ export function RecentSubmissions({
 
 	const handleRefresh = () => {
 		setIsRefreshing(true);
-		if (useExternalData && externalOnRefresh) {
-			externalOnRefresh();
-		} else {
-			liveSubmissions.refresh();
+		if (onRefresh) {
+			onRefresh();
 		}
 		setTimeout(() => setIsRefreshing(false), 1000);
 	};

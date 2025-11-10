@@ -42,9 +42,10 @@ export default function CTFScoreboard() {
   const { data: scoreboardResponse, isLoading, isError, error } = useScoreboard();
   const { data: fullScoreboard } = useFullScoreboard();
   const { data: challenges, isLoading: challengesLoading, isError: challengesError } = useChallenges();
-  const { data: submissionsData } = useSubmissions({ 
+  // Fetch all recent submissions for RecentSubmissions
+  const { data: submissionsData, isLoading: submissionsLoading, isError: submissionsError, error: submissionsErrorObj, refetch: refetchSubmissions } = useSubmissions({
     type: 'correct',
-    per_page: 1
+    per_page: 50,
   });
   const { data: ctfName, isLoading: ctfNameLoading } = useCtfName();
   const { data: endTime, isLoading: endTimeLoading } = useCtfEnd();
@@ -393,7 +394,13 @@ export default function CTFScoreboard() {
               <TabsContent value="scoreboard" className="space-y-4">
                 <div className="flex flex-col lg:flex-row gap-4">
                   <div className="lg:w-1/3 w-full">
-                    <RecentSubmissions />
+                    <RecentSubmissions
+                      submissions={submissionsData?.data || []}
+                      isLoading={submissionsLoading}
+                      isError={submissionsError}
+                      error={submissionsErrorObj}
+                      onRefresh={refetchSubmissions}
+                    />
                   </div>
                   <div className="lg:w-2/3 w-full">
                     <Card className="h-full">

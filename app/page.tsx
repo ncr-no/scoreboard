@@ -77,13 +77,21 @@ export default function CTFScoreboard() {
   const [challengesPage, setChallengesPage] = useState(1);
   const [firstBloods, setFirstBloods] = useState<Map<number, number>>(new Map());
   const [firstBloodUsers, setFirstBloodUsers] = useState<Map<number, {id: number, name: string}>>(new Map());
-  const [itemsPerPage] = useState(10);
   const [currentTab, setCurrentTab] = useState("scoreboard");
   const [showAuthWarning, setShowAuthWarning] = useState(false);
   const [showConfigDialog, setShowConfigDialog] = useState(false);
   const [selectedChallengeId, setSelectedChallengeId] = useState<number | null>(null);
   const [refreshCountdown, setRefreshCountdown] = useState(0);
-  const challengesPerPage = 10; // Match itemsPerPage for consistent height
+  const [dynamicItemsPerPage, setDynamicItemsPerPage] = useState(10);
+  const [dynamicChallengesPerPage, setDynamicChallengesPerPage] = useState(10);
+  const [analyticsFontSizes, setAnalyticsFontSizes] = useState({
+    title: 'text-xs',
+    description: 'text-[10px]',
+    body: 'text-xs',
+    statNumber: 'text-lg',
+    statLabel: 'text-[10px]',
+    badge: 'text-[10px]'
+  });
   const tabs = ["scoreboard", "challenges", "analytics"];
 
   // Detect authentication errors
@@ -206,7 +214,181 @@ export default function CTFScoreboard() {
     };
   }) : [];
 
-  const totalPages = Math.ceil(allusers.length / itemsPerPage);
+  // Calculate dynamic items per page based on viewport height
+  useEffect(() => {
+    const calculateItemsPerPage = () => {
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+      
+      // Detect mobile/tablet - use more conservative calculations
+      const isMobile = viewportWidth < 640;
+      const isTablet = viewportWidth >= 640 && viewportWidth < 1024;
+      
+      // Estimate heights of fixed elements based on responsive classes
+      // Header: py-3 sm:py-4 md:py-5 lg:py-6 (12px/16px/20px/24px top+bottom) + title height
+      let headerHeight = 100; // More conservative for mobile
+      if (viewportWidth >= 640) headerHeight = 90; // sm
+      if (viewportWidth >= 768) headerHeight = 100; // md
+      if (viewportWidth >= 1024) headerHeight = 110; // lg
+      
+      // Tabs: h-6 sm:h-7 md:h-8 lg:h-9 xl:h-10 (24px/28px/32px/36px/40px) + margin
+      let tabsHeight = 40; // More conservative for mobile
+      if (viewportWidth >= 640) tabsHeight = 35; // sm
+      if (viewportWidth >= 768) tabsHeight = 40; // md
+      if (viewportWidth >= 1024) tabsHeight = 45; // lg
+      if (viewportWidth >= 1280) tabsHeight = 50; // xl
+      
+      // Pagination: estimated height (more on mobile due to wrapping)
+      const paginationHeight = isMobile ? 70 : (isTablet ? 60 : 50);
+      
+      // Card padding: p-1.5 sm:p-2 md:p-2.5 lg:p-3 xl:p-4 (6px/8px/10px/12px/16px top+bottom)
+      let cardPadding = 12;
+      if (viewportWidth >= 640) cardPadding = 16; // sm
+      if (viewportWidth >= 768) cardPadding = 20; // md
+      if (viewportWidth >= 1024) cardPadding = 24; // lg
+      if (viewportWidth >= 1280) cardPadding = 32; // xl
+      
+      // Table header: h-7 sm:h-8 md:h-9 lg:h-10 (28px/32px/36px/40px)
+      let tableHeaderHeight = 28;
+      if (viewportWidth >= 640) tableHeaderHeight = 32; // sm
+      if (viewportWidth >= 768) tableHeaderHeight = 36; // md
+      if (viewportWidth >= 1024) tableHeaderHeight = 40; // lg
+      
+      // Calculate available height for table rows (add buffer for mobile browser chrome)
+      const mobileBuffer = isMobile ? 50 : (isTablet ? 30 : 0);
+      const availableHeight = Math.max(200, viewportHeight - headerHeight - tabsHeight - paginationHeight - cardPadding - tableHeaderHeight - mobileBuffer);
+      
+      // Estimate row height based on breakpoints (h-7 sm:h-8 md:h-9 lg:h-10)
+      let rowHeight = 28; // h-7 = 28px
+      if (viewportWidth >= 640) rowHeight = 32; // sm:h-8 = 32px
+      if (viewportWidth >= 768) rowHeight = 36; // md:h-9 = 36px
+      if (viewportWidth >= 1024) rowHeight = 40; // lg:h-10 = 40px
+      
+      // Calculate how many rows fit (subtract 1 for buffer)
+      const rowsThatFit = Math.max(1, Math.floor(availableHeight / rowHeight) - 1);
+      
+      // Set items per page: more conservative minimums for mobile/tablet
+      const minItems = isMobile ? 5 : (isTablet ? 8 : 10);
+      const calculated = Math.max(minItems, Math.min(rowsThatFit, 100));
+      setDynamicItemsPerPage(calculated);
+      setDynamicChallengesPerPage(calculated);
+    };
+
+    // Calculate on mount, resize, and tab change
+    calculateItemsPerPage();
+    window.addEventListener('resize', calculateItemsPerPage);
+    
+    return () => window.removeEventListener('resize', calculateItemsPerPage);
+  }, [currentTab]);
+
+  // Calculate dynamic font sizes for analytics based on viewport
+  useEffect(() => {
+    const calculateAnalyticsFontSizes = () => {
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      
+      // Detect mobile/tablet - use more conservative font sizes
+      const isMobile = viewportWidth < 640;
+      const isTablet = viewportWidth >= 640 && viewportWidth < 1024;
+      
+      // Base sizes on viewport dimensions - more conservative for mobile/tablet
+      // For title (CardTitle)
+      let titleSize = 'text-xs'; // 12px - default for mobile
+      if (isMobile) {
+        titleSize = 'text-xs'; // Keep small on mobile
+      } else if (isTablet) {
+        titleSize = viewportHeight >= 600 ? 'text-sm' : 'text-xs'; // 14px on tablet if enough height
+      } else {
+        // Desktop
+        if (viewportHeight >= 600) titleSize = 'text-sm'; // 14px
+        if (viewportHeight >= 700) titleSize = 'text-base'; // 16px
+        if (viewportHeight >= 800) titleSize = 'text-lg'; // 18px
+        if (viewportHeight >= 900) titleSize = 'text-xl'; // 20px
+      }
+      
+      // For description (CardDescription)
+      let descriptionSize = 'text-[10px]'; // 10px
+      if (isMobile) {
+        descriptionSize = 'text-[10px]'; // Keep small on mobile
+      } else if (isTablet) {
+        descriptionSize = viewportHeight >= 600 ? 'text-xs' : 'text-[10px]'; // 12px on tablet if enough height
+      } else {
+        if (viewportHeight >= 600) descriptionSize = 'text-xs'; // 12px
+        if (viewportHeight >= 800) descriptionSize = 'text-sm'; // 14px
+      }
+      
+      // For body text (user names, category names)
+      let bodySize = 'text-xs'; // 12px
+      if (isMobile) {
+        bodySize = 'text-xs'; // Keep small on mobile
+      } else if (isTablet) {
+        bodySize = viewportHeight >= 600 ? 'text-sm' : 'text-xs'; // 14px on tablet if enough height
+      } else {
+        if (viewportHeight >= 600) bodySize = 'text-sm'; // 14px
+        if (viewportHeight >= 800) bodySize = 'text-base'; // 16px
+      }
+      
+      // For stat numbers - more conservative scaling
+      let statNumberSize = 'text-lg'; // 18px
+      if (isMobile) {
+        statNumberSize = 'text-lg'; // Keep reasonable on mobile
+      } else if (isTablet) {
+        statNumberSize = viewportHeight >= 600 ? 'text-xl' : 'text-lg'; // 20px on tablet if enough height
+        if (viewportHeight >= 700) statNumberSize = 'text-2xl'; // 24px
+      } else {
+        // Desktop
+        if (viewportHeight >= 600) statNumberSize = 'text-xl'; // 20px
+        if (viewportHeight >= 700) statNumberSize = 'text-2xl'; // 24px
+        if (viewportHeight >= 800) statNumberSize = 'text-3xl'; // 30px
+        if (viewportHeight >= 900) statNumberSize = 'text-4xl'; // 36px
+      }
+      
+      // For stat labels
+      let statLabelSize = 'text-[10px]'; // 10px
+      if (isMobile) {
+        statLabelSize = 'text-[10px]'; // Keep small on mobile
+      } else if (isTablet) {
+        statLabelSize = viewportHeight >= 600 ? 'text-xs' : 'text-[10px]'; // 12px on tablet if enough height
+      } else {
+        if (viewportHeight >= 600) statLabelSize = 'text-xs'; // 12px
+        if (viewportHeight >= 800) statLabelSize = 'text-sm'; // 14px
+      }
+      
+      // For badges
+      let badgeSize = 'text-[10px]'; // 10px
+      if (isMobile) {
+        badgeSize = 'text-[10px]'; // Keep small on mobile
+      } else if (isTablet) {
+        badgeSize = viewportHeight >= 600 ? 'text-xs' : 'text-[10px]'; // 12px on tablet if enough height
+      } else {
+        if (viewportHeight >= 600) badgeSize = 'text-xs'; // 12px
+        if (viewportHeight >= 800) badgeSize = 'text-sm'; // 14px
+      }
+      
+      setAnalyticsFontSizes({
+        title: titleSize,
+        description: descriptionSize,
+        body: bodySize,
+        statNumber: statNumberSize,
+        statLabel: statLabelSize,
+        badge: badgeSize
+      });
+    };
+
+    calculateAnalyticsFontSizes();
+    window.addEventListener('resize', calculateAnalyticsFontSizes);
+    
+    return () => window.removeEventListener('resize', calculateAnalyticsFontSizes);
+  }, []);
+
+  const itemsPerPage = dynamicItemsPerPage;
+
+  // Reset to page 1 when data changes to avoid being on a non-existent page
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [allusers.length]);
+
+  const totalPages = Math.ceil(allusers.length / itemsPerPage) || 1;
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const users = allusers.slice(startIndex, endIndex);
@@ -214,8 +396,15 @@ export default function CTFScoreboard() {
   const handlePageChange = (page: number) => setCurrentPage(page);
   const handleChallengesPageChange = (page: number) => setChallengesPage(page);
 
+  const challengesPerPage = dynamicChallengesPerPage;
   const allChallenges = challenges || [];
-  const totalChallengesPages = Math.ceil(allChallenges.length / challengesPerPage);
+
+  // Reset to page 1 when challenges data changes
+  useEffect(() => {
+    setChallengesPage(1);
+  }, [allChallenges.length]);
+
+  const totalChallengesPages = Math.ceil(allChallenges.length / challengesPerPage) || 1;
   const challengesStartIndex = (challengesPage - 1) * challengesPerPage;
   const challengesEndIndex = challengesStartIndex + challengesPerPage;
   const paginatedChallenges = allChallenges.slice(challengesStartIndex, challengesEndIndex);
@@ -295,10 +484,10 @@ export default function CTFScoreboard() {
   };
 
   return (
-    <div className="h-screen overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 flex flex-col">
+    <div className="min-h-screen sm:h-screen overflow-y-auto sm:overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-950 dark:to-gray-900 flex flex-col">
       <DynamicTitle />
       {/* Maximize screen usage - remove max-width constraints */}
-      <div className="w-full flex-1 min-h-0 flex flex-col">
+      <div className="w-full flex-1 sm:flex-1 min-h-0 sm:min-h-0 flex flex-col">
         <div className="px-2 sm:px-3 md:px-4 lg:px-5 xl:px-6 flex-shrink-0">
           <div className="text-center py-3 sm:py-4 md:py-5 lg:py-6 relative">
             <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl xl:text-4xl 2xl:text-5xl font-bold text-gray-900 dark:text-white">
@@ -350,9 +539,9 @@ export default function CTFScoreboard() {
         ) : (
           <>
             {/* Main Layout: Left (Tabs Content) and Right (Stats + Submissions - Always Visible) */}
-            <div className="flex flex-col lg:flex-row gap-1 sm:gap-1.5 md:gap-2 lg:gap-2.5 flex-1 min-h-0">
+            <div className="flex flex-col lg:flex-row gap-1 sm:gap-1.5 md:gap-2 lg:gap-2.5 flex-1 sm:flex-1 min-h-0 sm:min-h-0">
               {/* Left Side - Tabbed Content (Scoreboard/Challenges/Analytics) - Takes more space */}
-              <div className="w-full lg:w-[65%] flex flex-col min-h-0">
+              <div className="w-full lg:w-[65%] flex flex-col min-h-0 sm:min-h-0">
                 <Tabs value={currentTab} onValueChange={setCurrentTab} className="flex flex-col flex-1 min-h-0">
                   <div className="mb-1 sm:mb-1.5 flex-shrink-0">
                     <TabsList className="grid w-full grid-cols-3 gap-0.5 sm:gap-1 h-6 sm:h-7 md:h-8 lg:h-9 xl:h-10">
@@ -362,9 +551,9 @@ export default function CTFScoreboard() {
                     </TabsList>
                   </div>
 
-                  <TabsContent value="scoreboard" className="flex-1 min-h-0 flex flex-col mt-1 sm:mt-1.5">
-                    <Card className="flex-1 min-h-0 flex flex-col">
-                      <CardContent className="p-1.5 sm:p-2 md:p-2.5 lg:p-3 xl:p-4 flex-1 flex flex-col min-h-0 overflow-hidden">
+                  <TabsContent value="scoreboard" className="flex-1 sm:flex-1 min-h-0 sm:min-h-0 flex flex-col mt-1 sm:mt-1.5">
+                    <Card className="flex-1 sm:flex-1 min-h-0 sm:min-h-0 flex flex-col">
+                      <CardContent className="p-1.5 sm:p-2 md:p-2.5 lg:p-3 xl:p-4 flex-1 sm:flex-1 flex flex-col min-h-0 sm:min-h-0 overflow-visible sm:overflow-hidden">
                         {isLoading ? (
                           <div className="p-2 sm:p-3">
                             <ScoreboardSkeleton />
@@ -375,7 +564,7 @@ export default function CTFScoreboard() {
                             <p className="text-xs sm:text-sm lg:text-base xl:text-lg 2xl:text-xl">{error?.message}</p>
                           </div>
                         ) : (
-                          <div className="flex-1 min-h-0 overflow-auto">
+                          <div className="flex-1 min-h-0 overflow-visible sm:overflow-auto">
                             <Table className="w-full">
                               <TableHeader className="sticky top-0 bg-background z-10">
                                 <TableRow className="h-7 sm:h-8 md:h-9 lg:h-10">
@@ -558,9 +747,9 @@ export default function CTFScoreboard() {
                     </Card>
                   </TabsContent>
 
-                  <TabsContent value="challenges" className="flex-1 min-h-0 flex flex-col mt-1 sm:mt-1.5">
-                <Card className="flex-1 min-h-0 flex flex-col">
-                  <CardContent className="p-1.5 sm:p-2 md:p-2.5 lg:p-3 xl:p-4 flex-1 flex flex-col min-h-0 overflow-hidden">
+                  <TabsContent value="challenges" className="flex-1 sm:flex-1 min-h-0 sm:min-h-0 flex flex-col mt-1 sm:mt-1.5">
+                <Card className="flex-1 sm:flex-1 min-h-0 sm:min-h-0 flex flex-col">
+                  <CardContent className="p-1.5 sm:p-2 md:p-2.5 lg:p-3 xl:p-4 flex-1 sm:flex-1 flex flex-col min-h-0 sm:min-h-0 overflow-visible sm:overflow-hidden">
                     {challengesLoading ? (
                       <div className="space-y-1 sm:space-y-1.5">
                         {[...Array(12)].map((_, i) => (
@@ -575,7 +764,7 @@ export default function CTFScoreboard() {
                       </div>
                     ) : allChallenges.length > 0 ? (
                       <>
-                        <div className="flex-1 min-h-0 overflow-auto">
+                        <div className="flex-1 min-h-0 overflow-visible sm:overflow-auto">
                           <Table>
                             <TableHeader className="sticky top-0 bg-background z-10">
                               <TableRow className="h-7 sm:h-8 md:h-9 lg:h-10">
@@ -767,11 +956,11 @@ export default function CTFScoreboard() {
               </TabsContent>
 
               <TabsContent value="analytics" className="flex-1 min-h-0 flex flex-col mt-1 sm:mt-1.5">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2 flex-1 min-h-0 overflow-auto">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2 flex-1 min-h-0 overflow-visible sm:overflow-auto pb-4 sm:pb-0">
                   <Card className="flex flex-col h-full">
                     <CardHeader className="px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 flex-shrink-0">
-                      <CardTitle className="text-xs sm:text-sm md:text-base">Top Performing Users</CardTitle>
-                      <CardDescription className="text-[10px] sm:text-xs">Users with highest scores</CardDescription>
+                      <CardTitle className={analyticsFontSizes.title}>Top Performing Users</CardTitle>
+                      <CardDescription className={analyticsFontSizes.description}>Users with highest scores</CardDescription>
                     </CardHeader>
                     <CardContent className="px-2 sm:px-3 md:px-4 flex-1">
                       <div className="space-y-2">
@@ -779,11 +968,11 @@ export default function CTFScoreboard() {
                           <div key={idx} className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1.5 min-w-0 flex-1">
                               <div className="w-1.5 h-1.5 bg-blue-500 rounded-full flex-shrink-0"></div>
-                              <span className="font-medium text-xs sm:text-sm truncate">{user.name}</span>
+                              <span className={`font-medium ${analyticsFontSizes.body} truncate`}>{user.name}</span>
                             </div>
                             <div className="flex items-center gap-1.5 flex-shrink-0">
-                              <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">{user.score} pts</span>
-                              <Badge variant="outline" className="text-[10px] h-4">#{user.rank}</Badge>
+                              <span className={`${analyticsFontSizes.body} text-gray-600 dark:text-gray-400`}>{user.score} pts</span>
+                              <Badge variant="outline" className={`${analyticsFontSizes.badge} h-4`}>#{user.rank}</Badge>
                             </div>
                           </div>
                         ))}
@@ -793,35 +982,35 @@ export default function CTFScoreboard() {
 
                   <Card className="flex flex-col h-full">
                     <CardHeader className="px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 flex-shrink-0">
-                      <CardTitle className="text-xs sm:text-sm md:text-base">Challenge Statistics</CardTitle>
-                      <CardDescription className="text-[10px] sm:text-xs">Overview of challenges and solving progress</CardDescription>
+                      <CardTitle className={analyticsFontSizes.title}>Challenge Statistics</CardTitle>
+                      <CardDescription className={analyticsFontSizes.description}>Overview of challenges and solving progress</CardDescription>
                     </CardHeader>
                     <CardContent className="px-2 sm:px-3 md:px-4 flex-1">
                       <div className="space-y-2">
                         <div className="grid grid-cols-2 gap-3 text-center">
                           <div>
-                            <div className="text-lg font-bold text-blue-600">{stats.totalChallenges}</div>
-                            <div className="text-[10px] text-gray-600 dark:text-gray-400">Total Challenges</div>
+                            <div className={`${analyticsFontSizes.statNumber} font-bold text-blue-600`}>{stats.totalChallenges}</div>
+                            <div className={`${analyticsFontSizes.statLabel} text-gray-600 dark:text-gray-400`}>Total Challenges</div>
                           </div>
                           <div>
-                            <div className="text-lg font-bold text-green-600">
+                            <div className={`${analyticsFontSizes.statNumber} font-bold text-green-600`}>
                               {challenges ? Object.keys(challenges.reduce((acc, c) => ({ ...acc, [c.category]: true }), {})).length : 0}
                             </div>
-                            <div className="text-[10px] text-gray-600 dark:text-gray-400">Categories</div>
+                            <div className={`${analyticsFontSizes.statLabel} text-gray-600 dark:text-gray-400`}>Categories</div>
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3 text-center">
                           <div>
-                            <div className="text-lg font-bold text-orange-600">
+                            <div className={`${analyticsFontSizes.statNumber} font-bold text-orange-600`}>
                               {challenges ? Math.round(challenges.reduce((sum, c) => sum + c.solves, 0) / Math.max(challenges.length, 1)) : 0}
                             </div>
-                            <div className="text-[10px] text-gray-600 dark:text-gray-400">Avg Solves</div>
+                            <div className={`${analyticsFontSizes.statLabel} text-gray-600 dark:text-gray-400`}>Average Solves</div>
                           </div>
                           <div>
-                            <div className="text-lg font-bold text-purple-600">
+                            <div className={`${analyticsFontSizes.statNumber} font-bold text-purple-600`}>
                               {challenges ? Math.max(...challenges.map(c => c.solves), 0) : 0}
                             </div>
-                            <div className="text-[10px] text-gray-600 dark:text-gray-400">Most Solved</div>
+                            <div className={`${analyticsFontSizes.statLabel} text-gray-600 dark:text-gray-400`}>Most Solved</div>
                           </div>
                         </div>
                       </div>
@@ -830,29 +1019,29 @@ export default function CTFScoreboard() {
 
                   <Card className="flex flex-col h-full">
                     <CardHeader className="px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 flex-shrink-0">
-                      <CardTitle className="text-xs sm:text-sm md:text-base">Competition Statistics</CardTitle>
-                      <CardDescription className="text-[10px] sm:text-xs">Overview of current competition state</CardDescription>
+                      <CardTitle className={analyticsFontSizes.title}>Competition Statistics</CardTitle>
+                      <CardDescription className={analyticsFontSizes.description}>Overview of current competition state</CardDescription>
                     </CardHeader>
                     <CardContent className="px-2 sm:px-3 md:px-4 flex-1">
                       <div className="space-y-2">
                         <div className="grid grid-cols-2 gap-3 text-center">
                           <div>
-                            <div className="text-lg font-bold text-blue-600">{stats.totalusers}</div>
-                            <div className="text-[10px] text-gray-600">Active Users</div>
+                            <div className={`${analyticsFontSizes.statNumber} font-bold text-blue-600`}>{stats.totalusers}</div>
+                            <div className={`${analyticsFontSizes.statLabel} text-gray-600`}>Active Users</div>
                           </div>
                           <div>
-                            <div className="text-lg font-bold text-green-600">{stats.topScore}</div>
-                            <div className="text-[10px] text-gray-600">Highest Score</div>
+                            <div className={`${analyticsFontSizes.statNumber} font-bold text-green-600`}>{stats.topScore}</div>
+                            <div className={`${analyticsFontSizes.statLabel} text-gray-600`}>Highest Score</div>
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3 text-center">
                           <div>
-                            <div className="text-lg font-bold text-orange-600">{stats.averageScore}</div>
-                            <div className="text-[10px] text-gray-600">Average Score</div>
+                            <div className={`${analyticsFontSizes.statNumber} font-bold text-orange-600`}>{stats.averageScore}</div>
+                            <div className={`${analyticsFontSizes.statLabel} text-gray-600`}>Average Score</div>
                           </div>
                           <div>
-                            <div className="text-lg font-bold text-purple-600">{stats.usersWithPoints}</div>
-                            <div className="text-[10px] text-gray-600">Users with Points</div>
+                            <div className={`${analyticsFontSizes.statNumber} font-bold text-purple-600`}>{stats.usersWithPoints}</div>
+                            <div className={`${analyticsFontSizes.statLabel} text-gray-600`}>Users with Points</div>
                           </div>
                         </div>
                       </div>
@@ -861,8 +1050,8 @@ export default function CTFScoreboard() {
 
                   <Card className="flex flex-col h-full">
                     <CardHeader className="px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 flex-shrink-0">
-                      <CardTitle className="text-xs sm:text-sm md:text-base">Challenge Categories</CardTitle>
-                      <CardDescription className="text-[10px] sm:text-xs">Distribution of challenges by category</CardDescription>
+                      <CardTitle className={analyticsFontSizes.title}>Challenge Categories</CardTitle>
+                      <CardDescription className={analyticsFontSizes.description}>Distribution of challenges by category</CardDescription>
                     </CardHeader>
                     <CardContent className="px-2 sm:px-3 md:px-4 flex-1">
                       <div className="space-y-2">
@@ -875,9 +1064,9 @@ export default function CTFScoreboard() {
                           <div key={category} className="flex items-center justify-between gap-2">
                             <div className="flex items-center gap-1 sm:gap-2 min-w-0 flex-1">
                               <div className={`w-1.5 h-1.5 sm:w-2 sm:h-2 ${getCategoryDotColor(category)} rounded-full flex-shrink-0`}></div>
-                              <span className="font-medium text-xs sm:text-sm truncate">{category}</span>
+                              <span className={`font-medium ${analyticsFontSizes.body} truncate`}>{category}</span>
                             </div>
-                            <Badge variant="outline" className="text-xs flex-shrink-0">{count} challenges</Badge>
+                            <Badge variant="outline" className={`${analyticsFontSizes.badge} flex-shrink-0`}>{count} challenges</Badge>
                           </div>
                         ))}
                       </div>

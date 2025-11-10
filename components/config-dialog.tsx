@@ -23,6 +23,7 @@ export function ConfigDialog() {
     apiToken: config.apiToken,
     refetchInterval: config.refetchInterval / 1000, // Store in seconds for UI
     topTeamsCount: config.topTeamsCount,
+    autoRotate: config.autoRotate,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -56,6 +57,7 @@ export function ConfigDialog() {
       apiToken: formData.apiToken.trim(),
       refetchInterval: interval * 1000, // Convert to milliseconds
       topTeamsCount: topTeams,
+      autoRotate: formData.autoRotate,
     });
     
     setOpen(false);
@@ -70,6 +72,15 @@ export function ConfigDialog() {
     }));
   };
 
+  const handleCheckboxChange = (field: 'autoRotate') => (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: e.target.checked,
+    }));
+  };
+
   return (
     <Dialog open={open} onOpenChange={(newOpen) => {
       setOpen(newOpen);
@@ -80,6 +91,7 @@ export function ConfigDialog() {
           apiToken: config.apiToken,
           refetchInterval: config.refetchInterval / 1000,
           topTeamsCount: config.topTeamsCount,
+          autoRotate: config.autoRotate,
         });
       }
     }}>
@@ -87,7 +99,7 @@ export function ConfigDialog() {
         <Button 
           variant="outline" 
           size="icon"
-          className="fixed top-4 right-4 z-50 shadow-lg"
+          className="shadow-md"
           aria-label="Settings"
         >
           <Settings className="h-4 w-4" />
@@ -162,6 +174,23 @@ export function ConfigDialog() {
             </p>
             <p className="text-xs text-amber-600 dark:text-amber-500 font-medium">
               ⚠️ Warning: Increasing this value can lead to API rate limiting, which may break most of the functionality.
+            </p>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <input
+                id="autoRotate"
+                type="checkbox"
+                checked={formData.autoRotate}
+                onChange={handleCheckboxChange('autoRotate')}
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              />
+              <Label htmlFor="autoRotate" className="text-sm font-normal cursor-pointer">
+                Auto-rotate tabs
+              </Label>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Automatically rotate between Scoreboard, Challenges, and Analytics tabs every 10 seconds
             </p>
           </div>
           <div className="flex gap-2 justify-end">
